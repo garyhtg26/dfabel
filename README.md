@@ -96,3 +96,11 @@ Customer signup sends an email verification link. Verify before ordering or acce
 The live service account may read/write orders but lack permission to create Firestore indexes. If customer order listing fails with a missing-index error, a project owner must create the checked-in composite index: collection `orders`, `uid` ascending, `createdAt` descending, collection scope. Wait until enabled before launch.
 
 `node scripts/check-auth-access.mjs` creates disposable Firebase test users and tests real API role boundaries and user management, then cleans them up. Run only in an explicitly authorized test project/workflow; it performs cloud writes. A missing customer index is reported as a blocked check and nonzero exit.
+
+## Vercel runtime compatibility
+
+`firebase-admin@14` pulls in `jwks-rsa@4`, which synchronously requires ESM-only `jose@6`. Some serverless runtimes disable Node's `require(ESM)` support, causing `ERR_REQUIRE_ESM` before route handlers run (including `/api/health`). A scoped npm override pins only `jwks-rsa`'s `jose` dependency to CommonJS-compatible `5.10.0`. Keep `package.json` and `package-lock.json` together when deploying.
+
+`npm run check:runtime` tests Firebase imports with `--no-experimental-require-module` and verifies JWKS key conversion/signature validation using locally generated disposable keys. It runs before every production build. Remove the override only after an upstream compatible fix passes this check.
+
+Upstream issue: https://github.com/auth0/node-jwks-rsa/issues/507
