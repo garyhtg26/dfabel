@@ -20,6 +20,7 @@ import {
   promoSchema,
 } from "@/lib/order-validation";
 import type { Order, Service } from "@/lib/types";
+import { serverFailure } from "@/lib/server-diagnostics";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -28,7 +29,7 @@ function fail(e: unknown) {
     return NextResponse.json({ error: e.message }, { status: e.status });
   if (e instanceof z.ZodError)
     return NextResponse.json({ error: e.issues[0].message }, { status: 400 });
-  console.error("D’Fable API failure", e instanceof Error ? e.name : "Unknown");
+  console.error("D’Fable API failure", serverFailure(e));
   return NextResponse.json(
     { error: "Layanan sedang tidak tersedia. Coba lagi beberapa saat." },
     { status: 500 },
