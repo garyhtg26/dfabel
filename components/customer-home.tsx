@@ -130,7 +130,7 @@ export default function CustomerHome({
             width={1536}
             height={1024}
             sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
-            src="/laundry-people-v2.png"
+            src="/unsplash/people.jpg"
             alt="Petugas laundry merawat cucian di studio putih dan biru"
           />
           <span className="photo-pill">
@@ -184,7 +184,7 @@ export default function CustomerHome({
                   sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
                   src={
                     s.id === "wash"
-                      ? "/laundry-people-v2.png"
+                      ? "/unsplash/shirt.jpg"
                       : s.id === "iron"
                         ? "/laundry-ironing-v3.png"
                         : "/laundry.png"

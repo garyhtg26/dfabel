@@ -1,7 +1,7 @@
 import "server-only";
 import type { NextRequest } from "next/server";
-import { adminAuth, firebaseReady } from "./admin";
-import { adminEmailAllowed } from "../access-policy";
+import { adminAuth, firebaseReady, db } from "./admin";
+import { resolveAccess, type AccessRole } from "../access-policy";
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -15,6 +15,8 @@ export type Identity = {
   email: string;
   name: string;
   admin: boolean;
+  manageUsers: boolean;
+  role: AccessRole;
 };
 export async function identity(
   req: NextRequest,
@@ -22,8 +24,7 @@ export async function identity(
 ): Promise<Identity | null> {
   const header = req.headers.get("authorization");
   if (!header) {
-    if (required)
-      throw new ApiError(401, "Silakan masuk dengan Google terlebih dahulu.");
+    if (required) throw new ApiError(401, "Silakan masuk terlebih dahulu.");
     return null;
   }
   if (!firebaseReady())
@@ -33,19 +34,27 @@ export async function identity(
     const token = await adminAuth().verifyIdToken(header.slice(7), true);
     if (
       !token.email_verified ||
-      token.firebase.sign_in_provider !== "google.com"
+      !["google.com", "password"].includes(token.firebase.sign_in_provider)
     )
       throw Error();
     const email = (token.email || "").toLowerCase();
+    const access = await db().doc(`access/${token.uid}`).get();
+    if (access.get("disabled")) throw Error();
+    const resolved = resolveAccess(
+      email,
+      !!token.email_verified,
+      token.firebase.sign_in_provider,
+      access.get("role"),
+      process.env.ADMIN_EMAILS || "",
+    );
+    const adminSurface = req.headers.get("x-dfable-surface") === "admin";
     return {
       uid: token.uid,
       email,
       name: token.name || "",
-      admin: adminEmailAllowed(
-        email,
-        !!token.email_verified,
-        process.env.ADMIN_EMAILS || "",
-      ),
+      admin: resolved.dashboard && adminSurface,
+      manageUsers: resolved.manageUsers && adminSurface,
+      role: resolved.role,
     };
   } catch {
     throw new ApiError(
@@ -56,6 +65,13 @@ export async function identity(
 }
 export function requireAdmin(user: Identity | null) {
   if (!user?.admin) throw new ApiError(403, "Akses khusus admin toko.");
+}
+export function requireManager(user: Identity | null) {
+  if (!user?.manageUsers)
+    throw new ApiError(
+      403,
+      "Akses khusus pemilik atau admin dengan login email–password.",
+    );
 }
 export function sameOrigin(req: NextRequest) {
   const origin = req.headers.get("origin");

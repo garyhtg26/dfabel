@@ -42,6 +42,8 @@ export async function readStore(user: Identity | null): Promise<Store> {
     orders,
     configured: true,
     isAdmin: !!user?.admin,
+    canManageUsers: !!user?.manageUsers,
+    role: user?.role || "customer",
     profile,
     hasMore,
   };

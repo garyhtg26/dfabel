@@ -1,6 +1,6 @@
 # D’Fable Laundry Studio
 
-Next.js App Router + React + TypeScript + Tailwind CSS 4, Firebase Authentication (Google), Firestore, Supabase private Storage, Google Maps/Places, and Lucide icons. Customer web at `/`, responsive shop dashboard/POS at `/dashboard`.
+Next.js App Router + React + TypeScript + Tailwind CSS 4, Firebase Authentication (Google + email/password), Firestore, Supabase private Storage, Google Maps/Places, and Lucide icons. Customer web at `/`, responsive shop dashboard/POS at `/dashboard`.
 
 ## Local development
 
@@ -18,11 +18,11 @@ Without Firebase credentials, the catalog and responsive UI render in **design p
 ## Connect Firebase
 
 1. Create a Firebase project, register a Web app, copy its public configuration into `NEXT_PUBLIC_FIREBASE_*` in `.env.local`.
-2. Enable **Authentication → Sign-in method → Google**. Add `localhost`, `127.0.0.1` if used, the stable Vercel domain, and your custom domain to Authorized domains.
+2. Enable **Authentication → Sign-in method → Google and Email/Password**. Add `localhost`, `127.0.0.1` if used, the stable Vercel domain, and your custom domain to Authorized domains.
 3. Create a **Firestore** database in production mode. Choose its location before creating real records.
 4. Create a Supabase project and a **private** bucket named `laundry-photos`. Set server-only `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (the new `sb_secret_` key), and `SUPABASE_STORAGE_BUCKET`. No public Storage policies are needed. Firebase still handles all login and order data; Supabase publishable keys and JWKS are not needed.
 5. Under Project settings → Service accounts, create an Admin SDK service account key. Put project ID, client email, and PEM private key into server-only `FIREBASE_*` variables. Never commit the key JSON or give it a `NEXT_PUBLIC_` prefix.
-6. Put verified Google email addresses for store staff in `ADMIN_EMAILS`, separated by commas. Customers cannot grant themselves admin access.
+6. Put owner email addresses in `ADMIN_EMAILS`, separated by commas. Owners must verify email and sign in with a password for dashboard access. The Pengguna & akses screen allows owners/admins to create, disable, delete, or change access for other users; owner accounts and the signed-in account are protected. Staff can process orders/POS; only owners/admins can edit prices, promo and users. Google sessions never receive dashboard privileges.
 7. Using the Firebase CLI with your own authenticated account, deploy the checked-in rules and index:
 
 ```sh
@@ -46,6 +46,7 @@ Vercel deployment is separate from configuring the Firebase and Supabase project
 
 ## Data and permissions
 
+- `access/{uid}`: server-managed role and disabled flag, checked on every authenticated request. Role changes revoke sessions. Account deletion preserves transaction records.
 - `orders`: UID-bound web orders, separate unclaimed walk-in orders, branch ID `cinere`, immutable original tariff, actual weight, confirmed transport fee, status history and manual payment status.
 - `users/{uid}`: Google email/name and required normalized WhatsApp number saved transactionally with each web order. Customer browser storage is not used for profiles.
 - `walkInCustomers`: name and phone stored by hashed phone identifier. No existing customer account is linked merely by an unverified phone match. Share its private tracking link with the walk-in customer.
@@ -87,3 +88,11 @@ node --conditions=react-server --import tsx scripts/check-services.ts # read-onl
 ```
 
 Image assets are local, delivered through Next Image on the customer homepage. Custom visual CSS complements Tailwind utilities and shared component styles. See `docs/image-assets.md` for image-generation provenance. The original logo is user supplied.
+
+## Email/password onboarding
+
+Customer signup sends an email verification link. Verify before ordering or accessing dashboard. Dashboard has no Google button or public signup. Existing Google users can use “Lupa / belum punya password?” to set a password through their inbox and then sign in with email/password. Owners without an account register on the customer site first. New staff accounts created by admin also need email verification; their initial password is never stored in Firestore.
+
+The live service account may read/write orders but lack permission to create Firestore indexes. If customer order listing fails with a missing-index error, a project owner must create the checked-in composite index: collection `orders`, `uid` ascending, `createdAt` descending, collection scope. Wait until enabled before launch.
+
+`node scripts/check-auth-access.mjs` creates disposable Firebase test users and tests real API role boundaries and user management, then cleans them up. Run only in an explicitly authorized test project/workflow; it performs cloud writes. A missing customer index is reported as a blocked check and nonzero exit.

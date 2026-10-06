@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AuthProvider } from "@/components/auth-provider";
 export const metadata: Metadata = {
   title: "D’Fable — Laundry Studio",
   description:
@@ -14,9 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body>
-        <AuthProvider>{children}</AuthProvider>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import CustomerHome from "./customer-home";
 import { useAuth } from "./auth-provider";
 import AccountPanel from "./account-panel";
+import UserManagement from "./user-management";
 import Tracking, { previewTracking } from "./tracking";
 import AuthorizedPhoto from "./authorized-photo";
 import type { TrackingOrder } from "@/lib/types";
@@ -104,30 +105,54 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
+  const sessionKey = `${auth.scope}:${auth.user?.uid || "guest"}:${auth.verified}:${auth.provider}`;
+  const activeSession = useRef(sessionKey);
+  activeSession.current = sessionKey;
+  const loadSequence = useRef(0);
   async function load() {
+    const capturedSession = sessionKey;
+    const sequence = ++loadSequence.current;
     try {
       const r = await auth.request("/api/store", { cache: "no-store" });
       if (!r.ok) throw Error("Data belum bisa dimuat");
       const data = await r.json();
+      if (
+        capturedSession !== activeSession.current ||
+        sequence !== loadSequence.current
+      )
+        return;
       setStore(data);
-      setProfile(
-        data.profile || { name: auth.user?.displayName || "", phone: "" },
-      );
+      setProfile({
+        name: data.profile?.name || auth.name,
+        phone: data.profile?.phone || "",
+      });
       setError("");
     } catch (e) {
-      setError((e as Error).message);
+      if (
+        capturedSession === activeSession.current &&
+        sequence === loadSequence.current
+      )
+        setError((e as Error).message);
     }
   }
   useEffect(() => {
+    setProfile({ name: auth.name, phone: "" });
+    setStore((previous) =>
+      previous
+        ? { ...previous, orders: [], isAdmin: false, canManageUsers: false }
+        : previous,
+    );
     load();
-    const q = new URLSearchParams(location.search).get("track");
+    const params = new URLSearchParams(location.search);
+    if (params.get("account") === "1" && !dashboard) setModal("login");
+    const q = params.get("track");
     if (q) {
       setTrack(q);
       setView("tracking");
     }
     const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
-  }, [auth.user]);
+  }, [auth.user?.uid, auth.verified, auth.provider, auth.name]);
   useEffect(() => {
     setPublicOrder(null);
     setTrackingError("");
@@ -158,9 +183,14 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
     window.scrollTo({ top: 0 });
   }, [view, adminView]);
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
     if (modal) {
       dialog.current?.showModal();
+      document.body.style.overflow = "hidden";
     } else dialog.current?.close();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
   }, [modal]);
   useEffect(() => {
     if (toast) {
@@ -187,7 +217,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   }
   function order(id = "complete") {
     setService(id);
-    if (!auth.user) {
+    if (!auth.user || !auth.verified) {
       pendingOrder.current = true;
       setModal("login");
       return;
@@ -225,7 +255,13 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
         )}
       </main>
     );
-  if (dashboard && store.configured && (!store.isAdmin || auth.loading))
+  if (
+    dashboard &&
+    (!store.isAdmin ||
+      auth.loading ||
+      auth.provider !== "password" ||
+      !auth.verified)
+  )
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 px-6 py-10">
         <Brand />
@@ -278,35 +314,42 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
               ["pos", "Kasir / POS", ReceiptText],
               ["prices", "Layanan & harga", Tags],
               ["promo", "Promosi", Megaphone],
-            ].map(([id, label, C]) => {
-              const Component = C as typeof Shirt;
-              return (
-                <button
-                  key={id as string}
-                  className={
-                    adminView === id ? "side-link active" : "side-link"
-                  }
-                  onClick={() => setAdminView(id as string)}
-                >
-                  <Component size={20} />
-                  {label as string}
-                  {id === "orders" && (
-                    <span className="count">
-                      {orders.filter((o) => o.status < 7).length}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+              ["users", "Pengguna & akses", ShieldCheck],
+            ]
+              .filter(
+                ([id]) =>
+                  !["users", "prices", "promo"].includes(id as string) ||
+                  store.canManageUsers,
+              )
+              .map(([id, label, C]) => {
+                const Component = C as typeof Shirt;
+                return (
+                  <button
+                    key={id as string}
+                    className={
+                      adminView === id ? "side-link active" : "side-link"
+                    }
+                    onClick={() => setAdminView(id as string)}
+                  >
+                    <Component size={20} />
+                    {label as string}
+                    {id === "orders" && (
+                      <span className="count">
+                        {orders.filter((o) => o.status < 7).length}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             <div className="sidebar-bottom">
               <span className="avatar">DF</span>
               <div>
                 <b>{auth.user?.displayName || "Preview admin"}</b>
                 <small>D’Fable Cinere</small>
               </div>
-              <a href="/" aria-label="Buka web pelanggan">
+              <button onClick={() => auth.logout()} aria-label="Keluar akun">
                 <LogOut size={18} />
-              </a>
+              </button>
             </div>
           </aside>
           <div className="admin-main">
@@ -323,11 +366,18 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                         pos: "Kasir",
                         prices: "Layanan & harga",
                         promo: "Promosi",
+                        users: "Pengguna & akses",
                       } as Record<string, string>
                     )[adminView]
                   }
                 </span>
               </span>
+              <button
+                aria-label="Keluar workspace"
+                onClick={() => auth.logout()}
+              >
+                <LogOut size={18} />
+              </button>
               <span className="branch-pill">
                 <MapPin size={14} /> Cinere
               </span>
@@ -337,15 +387,17 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                 <div>
                   <p className="eyebrow">RUANG KERJA TOKO</p>
                   <h1>
-                    {adminView === "overview"
-                      ? "Semua dalam kendali."
-                      : adminView === "orders"
-                        ? "Kelola pesanan"
-                        : adminView === "pos"
-                          ? "Pesanan langsung, tetap terhubung."
-                          : adminView === "prices"
-                            ? "Layanan & harga"
-                            : "Cerita baru di beranda."}
+                    {adminView === "users"
+                      ? "Tim yang tepat, akses yang aman."
+                      : adminView === "overview"
+                        ? "Semua dalam kendali."
+                        : adminView === "orders"
+                          ? "Kelola pesanan"
+                          : adminView === "pos"
+                            ? "Pesanan langsung, tetap terhubung."
+                            : adminView === "prices"
+                              ? "Layanan & harga"
+                              : "Cerita baru di beranda."}
                   </h1>
                   <p className="muted">
                     {adminView === "overview"
@@ -357,6 +409,9 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   <Plus size={18} /> Pesanan baru
                 </button>
               </div>
+              {adminView === "users" && store.canManageUsers && (
+                <UserManagement />
+              )}
               {adminView === "overview" && (
                 <>
                   <div className="metrics">
@@ -661,7 +716,13 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                 onClick={() => setModal("login")}
               >
                 <User size={18} />
-                <span>{profile.name || "Masuk"}</span>
+                <span>
+                  {auth.loading
+                    ? "Memuat…"
+                    : auth.user
+                      ? auth.name || "Akun saya"
+                      : "Masuk"}
+                </span>
               </button>
             </div>
           </header>
@@ -669,7 +730,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
             {view === "home" && (
               <CustomerHome
                 store={store}
-                name={profile.name}
+                name={auth.user ? auth.name : ""}
                 onOrder={order}
                 onMember={() => setModal("member")}
                 onTrack={(code) => {
@@ -786,7 +847,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                     title="Pesanan belum ditemukan"
                     text={
                       trackingError ||
-                      "Masuk dengan Google untuk mencari nomor pesanan, atau gunakan link tracking dari toko."
+                      "Masuk untuk mencari nomor pesanan, atau gunakan link tracking dari toko."
                     }
                   />
                 ) : (
@@ -858,7 +919,13 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
         onClick={(e) => {
           if (e.target === dialog.current) setModal("");
         }}
-        className={modal === "order" ? "order-dialog" : ""}
+        className={
+          modal === "order"
+            ? "order-dialog"
+            : modal === "login"
+              ? "auth-dialog"
+              : ""
+        }
       >
         <button
           className="close-button"

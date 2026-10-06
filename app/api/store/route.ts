@@ -8,6 +8,7 @@ import {
   ApiError,
   identity,
   requireAdmin,
+  requireManager,
   sameOrigin,
 } from "@/lib/firebase/access";
 import { defaultStore } from "@/lib/defaults";
@@ -207,7 +208,7 @@ export async function POST(req: NextRequest) {
         });
       });
     } else if (body.action === "prices") {
-      requireAdmin(user);
+      requireManager(user);
       const prices = pricesSchema.parse(body.data);
       await database.runTransaction(async (tx) => {
         const ref = database.doc("settings/cinere");
@@ -220,7 +221,7 @@ export async function POST(req: NextRequest) {
         tx.set(ref, { services, promo: settings.promo, updatedBy: user.uid });
       });
     } else if (body.action === "promo") {
-      requireAdmin(user);
+      requireManager(user);
       const promo = promoSchema.parse(body.data);
       await database.runTransaction(async (tx) => {
         const ref = database.doc("settings/cinere");

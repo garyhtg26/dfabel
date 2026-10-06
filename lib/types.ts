@@ -43,6 +43,8 @@ export type Store = {
   promo: { title: string; description: string; code: string; active: boolean };
   configured?: boolean;
   isAdmin?: boolean;
+  canManageUsers?: boolean;
+  role?: "owner" | "admin" | "staff" | "customer";
   profile?: CustomerProfile;
   hasMore?: boolean;
 };

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { calculatePrice, normalizePhone } from "../lib/pricing";
-import { adminEmailAllowed } from "../lib/access-policy";
+import { adminEmailAllowed, resolveAccess } from "../lib/access-policy";
 import { orderSchema, pricesSchema } from "../lib/order-validation";
 import { publicTracking } from "../lib/tracking-data";
 import type { Order } from "../lib/types";
@@ -118,6 +118,47 @@ test("price changes require four unique valid services and sensible package pric
     pricesSchema.safeParse(
       prices.map((p) => (p.id === "complete" ? { ...p, price: 1000 } : p)),
     ).success,
+    false,
+  );
+});
+
+test("dashboard privileges require verified password login and explicit roles", () => {
+  const owner = "owner@example.com";
+  assert.equal(
+    resolveAccess(owner, true, "google.com", undefined, owner).dashboard,
+    false,
+  );
+  assert.equal(
+    resolveAccess(owner, false, "password", undefined, owner).dashboard,
+    false,
+  );
+  assert.equal(
+    resolveAccess(owner, true, "password", undefined, owner).manageUsers,
+    true,
+  );
+  assert.equal(
+    resolveAccess("staff@example.com", true, "password", "staff", owner)
+      .dashboard,
+    true,
+  );
+  assert.equal(
+    resolveAccess("staff@example.com", true, "password", "staff", owner)
+      .manageUsers,
+    false,
+  );
+  assert.equal(
+    resolveAccess("admin@example.com", true, "google.com", "admin", owner)
+      .manageUsers,
+    false,
+  );
+  assert.equal(
+    resolveAccess("admin@example.com", true, "password", "admin", owner)
+      .manageUsers,
+    true,
+  );
+  assert.equal(
+    resolveAccess("customer@example.com", true, "password", "owner", owner)
+      .dashboard,
     false,
   );
 });
