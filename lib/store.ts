@@ -1,8 +1,48 @@
-import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync } from 'node:fs';
-import path from 'node:path';
-import type { Store } from './types';
-let connection:DatabaseSync;
-function db(){if(!connection){mkdirSync(path.join(process.cwd(),'data'),{recursive:true});connection=new DatabaseSync(path.join(process.cwd(),'data','dfable.sqlite'));connection.exec('PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS store (id INTEGER PRIMARY KEY, value TEXT NOT NULL)');const seed:Store={services:[{id:'complete',name:'Cuci, kering & setrika',description:'Bersih, wangi, rapi. Tinggal masuk lemari.',price:6000,unit:'kg',days:'2–3 hari',icon:'shirt'},{id:'wash',name:'Cuci & kering',description:'Untuk yang suka merapikan dengan caranya sendiri.',price:2000,unit:'kg',days:'2 hari',icon:'wash'},{id:'iron',name:'Setrika saja',description:'Pakaian kusut kembali rapi dan siap dipakai.',price:4000,unit:'kg',days:'1–2 hari',icon:'iron'},{id:'member',name:'D’Fable Monthly',description:'Kuota 30 kg, berlaku 30 hari. Aktivasi melalui toko.',price:150000,unit:'bulan',days:'30 kg / bulan',icon:'member'}],orders:[],promo:{title:'Cucian beres. Weekend bebas.',description:'Kenalan dengan cara baru merawat pakaian favoritmu. Jemput laundry langsung dari rumah.',code:'HELLODFABLE',active:true}};connection.prepare('INSERT OR IGNORE INTO store (id,value) VALUES (1,?)').run(JSON.stringify(seed));}return connection;}
-export function readStore():Store{return JSON.parse((db().prepare('SELECT value FROM store WHERE id=1').get() as {value:string}).value);}
-export function mutateStore(fn:(s:Store)=>void){const d=db();d.exec('BEGIN IMMEDIATE');try{const s=readStore();fn(s);d.prepare('UPDATE store SET value=? WHERE id=1').run(JSON.stringify(s));d.exec('COMMIT');return s;}catch(e){d.exec('ROLLBACK');throw e;}}
+import "server-only";
+import { db, firebaseReady } from "./firebase/admin";
+import { defaultStore } from "./defaults";
+import type { Identity } from "./firebase/access";
+import type { Order, Store } from "./types";
+export async function readStore(user: Identity | null): Promise<Store> {
+  if (!firebaseReady())
+    return { ...defaultStore, configured: false, isAdmin: false };
+  const database = db();
+  const settings = await database.doc("settings/cinere").get();
+  const data = settings.exists ? settings.data()! : defaultStore;
+  let orders: Order[] = [];
+  let hasMore = false;
+  let profile = { name: user?.name || "", phone: "", email: user?.email || "" };
+  if (user) {
+    const q = user.admin
+      ? database.collection("orders").orderBy("createdAt", "desc")
+      : database
+          .collection("orders")
+          .where("uid", "==", user.uid)
+          .orderBy("createdAt", "desc");
+    const [snap, p] = await Promise.all([
+      q.limit(501).get(),
+      database.doc(`users/${user.uid}`).get(),
+    ]);
+    hasMore = snap.size > 500;
+    orders = snap.docs.slice(0, 500).map((d) => {
+      const o = d.data() as Order;
+      const { photoPath, ...rest } = o;
+      return { ...rest, photo: photoPath ? `/api/orders/${o.id}/photo` : "" };
+    });
+    if (p.exists)
+      profile = {
+        name: p.get("name") || profile.name,
+        phone: p.get("phone") || "",
+        email: profile.email,
+      };
+  }
+  return {
+    services: data.services,
+    promo: data.promo,
+    orders,
+    configured: true,
+    isAdmin: !!user?.admin,
+    profile,
+    hasMore,
+  };
+}

@@ -1,0 +1,7 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Private laundry photos are served by the authorized Next.js photo endpoint.
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}

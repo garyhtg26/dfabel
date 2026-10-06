@@ -1,0 +1,17 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "orders", "fieldPath": "notes", "indexes": [] },
+    { "collectionGroup": "orders", "fieldPath": "address", "indexes": [] },
+    { "collectionGroup": "orders", "fieldPath": "history", "indexes": [] }
+  ]
+}

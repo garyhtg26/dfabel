@@ -4,3 +4,6 @@ node_modules/
 !.env.example
 data/
 *.tsbuildinfo
+.vercel/
+*service-account*.json
+*-firebase-adminsdk-*.json
