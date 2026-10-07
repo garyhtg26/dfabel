@@ -54,5 +54,6 @@ export const promoSchema = z.object({
   title: z.string().trim().min(3).max(90),
   description: z.string().max(220),
   code: z.string().max(24),
+  button: z.string().trim().min(1).max(35).default("Jemput sekarang"),
   active: z.boolean(),
 });

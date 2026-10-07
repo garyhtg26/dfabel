@@ -1,5 +1,6 @@
 "use client";
 
+import { branches } from "@/lib/branches";
 import { useState } from "react";
 import Image from "next/image";
 import {
@@ -20,6 +21,7 @@ import {
 } from "lucide-react";
 import { money, type Store } from "@/lib/types";
 import "./customer-home.css";
+import { siteContent, siteImage } from "@/lib/site-content";
 
 type Props = {
   store: Store;
@@ -47,6 +49,7 @@ export default function CustomerHome({
   onAccount,
   onServices,
 }: Props) {
+  const content = siteContent(store.content);
   const [category, setCategory] = useState("all");
   const [code, setCode] = useState("");
   const wash = store.services.find((s) => s.id === "wash")!;
@@ -65,8 +68,7 @@ export default function CustomerHome({
     <div className="customer-experience">
       <div className="app-welcome">
         <div>
-          <p>Halo{name ? `, ${name}` : ", teman D’Fable"}.</p>
-          <h1>Hari ini, bebas cucian.</h1>
+          <h1>{name ? `Halo, ${name}` : "D’Fable Laundry"}</h1>
         </div>
         <button
           className="welcome-account"
@@ -78,15 +80,14 @@ export default function CustomerHome({
         <div className="studio-location">
           <MapPin size={18} />
           <div>
-            <small>STUDIO PILIHANMU</small>
-            <strong>D’Fable Cinere</strong>
+            <strong>D’Fable {branches[store.branchId || "cinere"]}</strong>
           </div>
           <ChevronDown size={16} />
         </div>
       </div>
 
       <section
-        className={`campaign-grid ${!store.promo.active ? "no-campaign" : ""}`}
+        className={`campaign-grid ${!store.promo.active || !content.people.active ? "no-campaign" : ""}`}
         aria-label="Pilihan D’Fable"
       >
         {store.promo.active && (
@@ -95,7 +96,8 @@ export default function CustomerHome({
               width={1536}
               height={1024}
               sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
-              src="/promo-washer-v2.png"
+              src={siteImage(content, "promo")}
+              unoptimized
               alt="Mesin cuci putih dan perlengkapan laundry di latar biru"
               className="campaign-photo"
             />
@@ -103,72 +105,59 @@ export default function CustomerHome({
               <span className="campaign-kicker">
                 PROMO PILIHAN {!store.configured && <span>DEMO</span>}
               </span>
-              <h2>
-                {store.promo.title === "Cucian beres. Weekend bebas." ? (
-                  <>
-                    Cucian numpuk?
-                    <br />
-                    Beresin, yuk.
-                  </>
-                ) : (
-                  store.promo.title
-                )}
-              </h2>
+              <h2>{store.promo.title}</h2>
               <p className="campaign-price">
-                <span>CUCI KERING · HINGGA 10 KG</span>
+                <span>{store.promo.description}</span>
                 <strong>{money(wash.price * 10)}</strong>
               </p>
               <button onClick={() => onOrder("wash")}>
-                Jemput sekarang <Plus size={17} />
+                {store.promo.button || "Jemput sekarang"} <Plus size={17} />
               </button>
               <span className="campaign-code">{store.promo.code}</span>
             </div>
           </article>
         )}
-        <article className="people-feature">
-          <Image
-            width={1536}
-            height={1024}
-            sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
-            src="/unsplash/people.jpg"
-            alt="Petugas laundry merawat cucian di studio putih dan biru"
-          />
-          <span className="photo-pill">
-            <Shirt size={15} /> A little care, every day.
-          </span>
-          <div className="people-copy">
-            <span>DARI KERANJANG KE LEMARI.</span>
-            <h2>
-              Biar kami
-              <br />
-              yang urus.
-            </h2>
-            <button onClick={() => onOrder()}>
-              <Truck size={18} /> Jadwalkan jemput
-            </button>
-          </div>
-        </article>
+        {content.people.active && (
+          <article className="people-feature">
+            <Image
+              width={1536}
+              height={1024}
+              sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
+              src={siteImage(content, "people")}
+              unoptimized
+              alt="Petugas laundry merawat cucian di studio putih dan biru"
+            />
+            <div className="people-copy">
+              <h2>{content.people.title}</h2>
+              <button onClick={() => onOrder()}>
+                <Truck size={18} /> {content.people.button}
+              </button>
+            </div>
+          </article>
+        )}
       </section>
 
       <section className="browse-laundry" aria-label="Pilih layanan">
         <div className="browse-heading">
-          <h2>Mau laundry apa?</h2>
+          <h2>Layanan</h2>
           <button onClick={onServices}>Daftar harga</button>
         </div>
         <div className="category-row" role="group" aria-label="Filter layanan">
-          {categories.map(({ id, label, icon: Icon }) => (
-            <button
-              aria-pressed={category === id}
-              key={id}
-              className={category === id ? "selected" : ""}
-              onClick={() => setCategory(id)}
-            >
-              <span>
-                <Icon size={26} strokeWidth={1.6} />
-              </span>
-              <b>{label}</b>
-            </button>
-          ))}
+          {categories
+            .filter((c) => c.id !== "member" || content.member.active)
+            .map(({ id, label, icon: Icon }) => (
+              <button
+                aria-pressed={category === id}
+                key={id}
+                className={category === id ? "selected" : ""}
+                onClick={() => setCategory(id)}
+              >
+                <span>
+                  <Icon size={26} strokeWidth={1.6} />
+                </span>
+                <b>{label}</b>
+              </button>
+            ))}
         </div>
         <div className="photo-service-grid">
           {services.map((s) => (
@@ -182,13 +171,8 @@ export default function CustomerHome({
                   width={1536}
                   height={1024}
                   sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
-                  src={
-                    s.id === "wash"
-                      ? "/unsplash/shirt.jpg"
-                      : s.id === "iron"
-                        ? "/laundry-ironing-v3.png"
-                        : "/laundry.png"
-                  }
+                  src={siteImage(content, s.id as "wash" | "iron" | "complete")}
+                  unoptimized
                   alt={
                     s.id === "wash"
                       ? "Perawatan cucian di studio"
@@ -226,22 +210,23 @@ export default function CustomerHome({
               </div>
             </button>
           ))}
-          {category === "member" && (
+          {category === "member" && content.member.active && (
             <button className="membership-feature" onClick={onMember}>
+              <img
+                className="membership-image"
+                src={siteImage(content, "member")}
+                alt="Paket bulanan"
+              />
               <Layers size={34} />
-              <span>THE EVERYDAY CLUB</span>
-              <h3>
-                Cucian rutin.
-                <br />
-                Tinggal beres.
-              </h3>
+
+              <h3>{content.member.title}</h3>
               <strong>
                 {money(member.price)}
                 <small> / bulan</small>
               </strong>
               <p>30 kg · 30 hari · Paket demo</p>
               <span className="membership-link">
-                Lihat paket <Plus size={18} />
+                {content.member.button} <Plus size={18} />
               </span>
             </button>
           )}
@@ -253,50 +238,49 @@ export default function CustomerHome({
       </section>
 
       <div className="customer-bottom-grid">
-        <section className="tracking-ribbon">
-          <span className="ribbon-icon">
-            <Package size={27} />
-          </span>
-          <div>
-            <h2>Cucianmu, sudah di mana?</h2>
-            <p>Satu nomor. Semua update.</p>
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              onTrack(code);
-            }}
-          >
-            <label>
-              <Search size={18} />
-              <input
-                required
-                aria-label="Nomor pesanan"
-                placeholder="Nomor pesanan"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-              />
-            </label>
-            <button type="submit">Lacak</button>
-          </form>
-        </section>
-        <button className="monthly-strip" onClick={onMember}>
-          <Layers size={26} />
-          <div>
-            <span>D’FABLE MONTHLY</span>
-            <h3>Rutin bersih, lebih praktis.</h3>
-          </div>
-          <Plus size={21} />
-        </button>
-      </div>
-      <div className="care-signoff">
-        <span>
-          <Check size={15} /> Catatan perawatan diperhatikan
-        </span>
-        <span>
-          <Truck size={16} /> Dari & ke rumahmu
-        </span>
-        <b>Less laundry. More living.</b>
+        {content.tracking.active && (
+          <section className="tracking-ribbon">
+            <span className="ribbon-icon">
+              <Package size={27} />
+            </span>
+            <div>
+              <h2>{content.tracking.title}</h2>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                onTrack(code);
+              }}
+            >
+              <label>
+                <Search size={18} />
+                <input
+                  required
+                  aria-label="Nomor pesanan"
+                  placeholder="Nomor pesanan"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                />
+              </label>
+              <button type="submit">Lacak</button>
+            </form>
+          </section>
+        )}
+        {content.member.active && (
+          <button className="monthly-strip" onClick={onMember}>
+            <img
+              className="monthly-thumb"
+              src={siteImage(content, "member")}
+              alt="Paket bulanan"
+            />
+            <div>
+              <span>D’FABLE MONTHLY</span>
+              <h3>{content.member.title}</h3>
+            </div>
+            <span className="monthly-action">{content.member.button}</span>
+            <Plus size={21} />
+          </button>
+        )}
       </div>
     </div>
   );

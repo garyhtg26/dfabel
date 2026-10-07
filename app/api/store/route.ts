@@ -1,3 +1,4 @@
+import { requestBranch } from "@/lib/branches";
 import { photoStorageReady, uploadPhoto } from "@/lib/storage/photos";
 import { NextRequest, NextResponse } from "next/server";
 import { createHash, randomUUID } from "node:crypto";
@@ -37,9 +38,12 @@ function fail(e: unknown) {
 }
 export async function GET(req: NextRequest) {
   try {
-    return NextResponse.json(await readStore(await identity(req)), {
-      headers: { "Cache-Control": "private, no-store" },
-    });
+    return NextResponse.json(
+      await readStore(await identity(req), requestBranch(req.url)),
+      {
+        headers: { "Cache-Control": "private, no-store" },
+      },
+    );
   } catch (e) {
     return fail(e);
   }
@@ -47,6 +51,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     sameOrigin(req);
+    const branch = requestBranch(req.url);
     if (!firebaseReady())
       throw new ApiError(
         503,
@@ -73,7 +78,7 @@ export async function POST(req: NextRequest) {
       if (input.date < today)
         throw new ApiError(400, "Jadwal tidak boleh di masa lalu.");
       const key = createHash("sha256")
-        .update(`${user.uid}:${input.requestId}`)
+        .update(`${branch}:${user.uid}:${input.requestId}`)
         .digest("hex");
       id = "DF-" + key.slice(0, 12).toUpperCase();
       const ref = database.doc(`orders/${id}`);
@@ -81,7 +86,7 @@ export async function POST(req: NextRequest) {
       if (existing.exists) {
         if (existing.get("createdBy") !== user.uid)
           throw new ApiError(409, "Konflik nomor pesanan.");
-        return NextResponse.json({ store: await readStore(user), id });
+        return NextResponse.json({ store: await readStore(user, branch), id });
       }
       let photoPath = "";
       if (input.photo) {
@@ -98,7 +103,7 @@ export async function POST(req: NextRequest) {
       }
       await database.runTransaction(async (tx) => {
         const [settings, prior, rate] = await Promise.all([
-          tx.get(database.doc("settings/cinere")),
+          tx.get(database.doc(`settings/${branch}`)),
           tx.get(ref),
           tx.get(database.doc(`rateLimits/${user.uid}`)),
         ]);
@@ -124,7 +129,7 @@ export async function POST(req: NextRequest) {
           id,
           token,
           uid: input.source === "pos" ? null : user.uid,
-          branchId: "cinere",
+          branchId: branch,
           actualKg: input.source === "pos" ? input.kg : null,
           status,
           paid: false,
@@ -177,6 +182,11 @@ export async function POST(req: NextRequest) {
         const snap = await tx.get(ref);
         if (!snap.exists) throw new ApiError(404, "Pesanan tidak ditemukan.");
         const o = snap.data() as Order;
+        if (o.branchId !== branch)
+          throw new ApiError(
+            409,
+            "Pesanan berada di cabang lain. Buka workspace yang sesuai.",
+          );
         if (v.status < o.status)
           throw new ApiError(400, "Status tidak boleh mundur.");
         if (v.paid && v.shippingFee === null)
@@ -212,29 +222,37 @@ export async function POST(req: NextRequest) {
       requireManager(user);
       const prices = pricesSchema.parse(body.data);
       await database.runTransaction(async (tx) => {
-        const ref = database.doc("settings/cinere");
+        const ref = database.doc(`settings/${branch}`);
         const snap = await tx.get(ref);
-        const settings = snap.exists ? snap.data()! : defaultStore;
+        const settings = { ...defaultStore, ...snap.data() };
         const services = (settings.services as Service[]).map((s) => ({
           ...s,
           price: prices.find((v) => v.id === s.id)!.price,
         }));
-        tx.set(ref, { services, promo: settings.promo, updatedBy: user.uid });
+        tx.set(
+          ref,
+          { services, promo: settings.promo, updatedBy: user.uid },
+          { merge: true },
+        );
       });
     } else if (body.action === "promo") {
       requireManager(user);
       const promo = promoSchema.parse(body.data);
       await database.runTransaction(async (tx) => {
-        const ref = database.doc("settings/cinere");
+        const ref = database.doc(`settings/${branch}`);
         const snap = await tx.get(ref);
-        tx.set(ref, {
-          services: snap.get("services") || defaultStore.services,
-          promo,
-          updatedBy: user.uid,
-        });
+        tx.set(
+          ref,
+          {
+            services: snap.get("services") || defaultStore.services,
+            promo,
+            updatedBy: user.uid,
+          },
+          { merge: true },
+        );
       });
     } else throw new ApiError(400, "Aksi tidak dikenal.");
-    return NextResponse.json({ store: await readStore(user), id });
+    return NextResponse.json({ store: await readStore(user, branch), id });
   } catch (e) {
     return fail(e);
   }

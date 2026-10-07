@@ -38,9 +38,17 @@ export type Order = {
 };
 export type CustomerProfile = { name: string; phone: string; email?: string };
 export type Store = {
+  branchId?: import("./branches").BranchId;
+  content?: import("./site-content").SiteContent;
   services: Service[];
   orders: Order[];
-  promo: { title: string; description: string; code: string; active: boolean };
+  promo: {
+    title: string;
+    description: string;
+    code: string;
+    active: boolean;
+    button?: string;
+  };
   configured?: boolean;
   isAdmin?: boolean;
   canManageUsers?: boolean;

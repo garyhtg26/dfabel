@@ -75,10 +75,17 @@ export async function GET(req: NextRequest) {
           ...result.users.map((u) => db().doc(`access/${u.uid}`)),
         )
       : [];
+    const profiles = result.users.length
+      ? await db().getAll(
+          ...result.users.map((u) => db().doc(`users/${u.uid}`)),
+        )
+      : [];
     const users = result.users.map((u, i) => ({
       uid: u.uid,
       email: u.email || "",
       name: u.displayName || "",
+      phone: profiles[i]?.get("phone") || "",
+      createdAt: u.metadata.creationTime,
       verified: u.emailVerified,
       disabled: u.disabled || !!access[i]?.get("disabled"),
       role: adminEmailAllowed(
@@ -123,14 +130,12 @@ export async function POST(req: NextRequest) {
         emailVerified: false,
       });
       try {
-        await db()
-          .doc(`access/${user.uid}`)
-          .set({
-            role: input.role,
-            disabled: false,
-            updatedBy: actor!.uid,
-            updatedAt: new Date().toISOString(),
-          });
+        await db().doc(`access/${user.uid}`).set({
+          role: input.role,
+          disabled: false,
+          updatedBy: actor!.uid,
+          updatedAt: new Date().toISOString(),
+        });
       } catch (e) {
         await adminAuth().deleteUser(user.uid);
         throw e;

@@ -18,6 +18,8 @@ import {
   reload,
   signInWithPopup,
   signOut,
+  setPersistence,
+  browserSessionPersistence,
   type User,
 } from "firebase/auth";
 import { clientAuth, clientReady } from "@/lib/firebase/client";
@@ -97,9 +99,22 @@ export function AuthProvider({
       setSession({ ...initial, loading: false });
       return;
     }
-    return onIdTokenChanged(clientAuth(scope), () => {
-      void sync().catch(() => setSession({ ...initial, loading: false }));
-    });
+    let disposed = false;
+    let unsubscribe = () => {};
+    void setPersistence(clientAuth(scope), browserSessionPersistence)
+      .then(() => {
+        if (disposed) return;
+        unsubscribe = onIdTokenChanged(clientAuth(scope), () => {
+          void sync().catch(() => setSession({ ...initial, loading: false }));
+        });
+      })
+      .catch(() => {
+        if (!disposed) setSession({ ...initial, loading: false });
+      });
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
   }, [scope, sync]);
   useEffect(() => {
     if (!session.user || session.verified) return;
@@ -148,16 +163,19 @@ export function AuthProvider({
         login: async () => {
           if (scope !== "customer") throw Error("Dashboard requires password");
           const provider = new GoogleAuthProvider();
+          await setPersistence(clientAuth(scope), browserSessionPersistence);
           provider.setCustomParameters({ prompt: "select_account" });
           await signInWithPopup(clientAuth(scope), provider);
           await sync();
         },
         loginEmail: async (email, password) => {
+          await setPersistence(clientAuth(scope), browserSessionPersistence);
           await signInWithEmailAndPassword(clientAuth(scope), email, password);
           await sync();
         },
         register: async (name, email, password) => {
           if (scope !== "customer") throw Error("Customer signup only");
+          await setPersistence(clientAuth(scope), browserSessionPersistence);
           const result = await createUserWithEmailAndPassword(
             clientAuth(scope),
             email,

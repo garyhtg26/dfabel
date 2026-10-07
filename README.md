@@ -104,3 +104,19 @@ The live service account may read/write orders but lack permission to create Fir
 `npm run check:runtime` tests Firebase imports with `--no-experimental-require-module` and verifies JWKS key conversion/signature validation using locally generated disposable keys. It runs before every production build. Remove the override only after an upstream compatible fix passes this check.
 
 Upstream issue: https://github.com/auth0/node-jwks-rsa/issues/507
+
+## Dashboard profiles and website media
+
+The account card opens Profile and Sign out. Profile edits the current user's name; email is read-only and rejected by the profile API if submitted as an edit. Password changes use Firebase reauthentication with the current password (8-character minimum for the replacement). Customer and dashboard sessions remain separate.
+
+Profile photos and website images use the existing private Supabase `SUPABASE_STORAGE_BUCKET`; no public bucket or extra credentials are needed. The upload APIs bound the request to 2 MB, decode and resize JPEGs, and remove metadata. The UI accepts JPG, PNG and WebP up to 8 MB before compression. Profile photos are served only to their authenticated owner. Fixed website banner slots are publicly readable via `/api/media/banners/[slot]`; only owners/admins can replace them. This does not expose laundry order photos.
+
+Banner & promotions controls the main promotion, pickup banner, monthly membership banner, tracking section and the three service images. Image uploads publish immediately; text/visibility changes use Save. Older Firestore settings continue using bundled image defaults. Settings writes merge fields, preserving image settings when prices or promotion text change.
+
+User management lists Firebase Auth accounts, including users without orders. WhatsApp is joined from the Firestore `users` profile saved during ordering; accounts that have not supplied a number show “Belum diisi”. Search covers the currently loaded list; use Load more to include subsequent pages.
+
+### Workspace cabang
+
+Dashboard menyediakan Cinere dan Bogor. Cabang aktif tersimpan di parameter URL `branch`, sehingga refresh tetap membuka workspace yang sama. Pesanan POS, harga, promo, dan gambar tersimpan per cabang. Web pelanggan dapat dibuka lewat `/?branch=bogor`; tanpa parameter memakai Cinere. Akun pengguna dan role tetap berlaku untuk kedua cabang. Pengaturan Bogor menggunakan nilai awal sampai disimpan sendiri, tanpa menyalin pesanan Cinere.
+
+Daftar pesanan admin memakai indeks single-field `branchId`, lalu mengurutkan hasil sebelum membatasi tampilan ke 500 pesanan. Untuk volume besar, ganti dengan pagination dan indeks gabungan `branchId`/`createdAt` agar pembacaan tidak meningkat bersama jumlah seluruh pesanan cabang.

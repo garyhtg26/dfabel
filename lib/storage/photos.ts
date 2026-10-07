@@ -31,7 +31,11 @@ async function privateBucket() {
 }
 
 function objectPath(path: string) {
-  if (!/^orders\/[^/]+\/DF-[A-F0-9]{12}\.jpg$/.test(path))
+  if (
+    !/^(?:orders\/[^/]+\/DF-[A-F0-9]{12}|profiles\/[^/]+\/avatar|banners\/(?:bogor\/)?(?:promo|people|member|wash|complete|iron)\/image)\.jpg$/.test(
+      path,
+    )
+  )
     throw new Error("INVALID_PHOTO_PATH");
   return path.split("/").map(encodeURIComponent).join("/");
 }

@@ -5,6 +5,8 @@ import { useAuth } from "./auth-provider";
 type Row = {
   uid: string;
   email: string;
+  phone: string;
+  createdAt: string;
   name: string;
   role: string;
   disabled: boolean;
@@ -20,6 +22,7 @@ export default function UserManagement() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [adding, setAdding] = useState(false);
+  const [query, setQuery] = useState("");
   const [pending, setPending] = useState<Row | null>(null);
   async function load(next?: string) {
     setError("");
@@ -171,18 +174,33 @@ export default function UserManagement() {
           </button>
         </div>
       )}
+      <label className="users-search">
+        <span className="sr-only">Cari pengguna dari daftar yang dimuat</span>
+        <input
+          type="search"
+          placeholder="Cari nama, email, atau WhatsApp"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </label>
       <div className="users-list">
-        {users.map((u) => (
-          <UserRow
-            key={u.uid}
-            row={u}
-            busy={busy}
-            onSave={(role, disabled) =>
-              mutate({ action: "access", uid: u.uid, role, disabled })
-            }
-            onDelete={() => setPending(u)}
-          />
-        ))}
+        {users
+          .filter((u) =>
+            `${u.name} ${u.email} ${u.phone || ""}`
+              .toLowerCase()
+              .includes(query.toLowerCase()),
+          )
+          .map((u) => (
+            <UserRow
+              key={u.uid}
+              row={u}
+              busy={busy}
+              onSave={(role, disabled) =>
+                mutate({ action: "access", uid: u.uid, role, disabled })
+              }
+              onDelete={() => setPending(u)}
+            />
+          ))}
       </div>
       {!users.length && !error && <p className="muted">Memuat pengguna…</p>}
       {cursor && (
@@ -230,6 +248,12 @@ function UserRow({
           {row.self ? " · kamu" : ""}
         </b>
         <span>{row.email}</span>
+        <span>WhatsApp: {row.phone || "Belum diisi"}</span>
+        {row.createdAt && !Number.isNaN(Date.parse(row.createdAt)) && (
+          <small>
+            Terdaftar {new Date(row.createdAt).toLocaleDateString("id-ID")}
+          </small>
+        )}
         <small>
           {row.verified ? "Email terverifikasi" : "Belum verifikasi"} ·{" "}
           {row.disabled ? "Nonaktif" : "Aktif"}

@@ -120,19 +120,7 @@ export default function EmailAction({
       </a>
       <div className="email-layout">
         <aside className="email-story">
-          <span className="email-story-tag">A LITTLE CARE, EVERY DAY.</span>
-          <h1>
-            Hal kecil.
-            <br />
-            Rasa tenang
-            <br />
-            yang besar.
-          </h1>
-          <p>
-            Mulai dari akun yang aman,
-            <br />
-            sampai pakaian yang terawat.
-          </p>
+          <h1>Akun D’Fable</h1>
           <Image
             src="/laundry.png"
             width={1536}

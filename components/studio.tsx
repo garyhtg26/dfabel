@@ -5,6 +5,9 @@ import CustomerHome from "./customer-home";
 import { useAuth } from "./auth-provider";
 import AccountPanel from "./account-panel";
 import UserManagement from "./user-management";
+import DashboardAccount from "./dashboard-account";
+import { branches, type BranchId } from "@/lib/branches";
+import ContentEditor from "./content-editor";
 import Tracking, { previewTracking } from "./tracking";
 import AuthorizedPhoto from "./authorized-photo";
 import type { TrackingOrder } from "@/lib/types";
@@ -88,11 +91,24 @@ function Icon({ service, size = 25 }: { service: Service; size?: number }) {
 }
 export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   const auth = useAuth();
+  const [branch, setBranch] = useState<BranchId>("cinere");
+  const branchName = branches[branch];
+  useEffect(() => {
+    const initial = new URLSearchParams(window.location.search).get("branch");
+    if (initial === "bogor" || initial === "cinere") setBranch(initial);
+  }, []);
+  function switchBranch(next: BranchId) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("branch", next);
+    window.history.replaceState(window.history.state, "", url);
+    setBranch(next);
+  }
   const pendingOrder = useRef(false);
   const [publicOrder, setPublicOrder] = useState<TrackingOrder | null>(null);
   const [trackingError, setTrackingError] = useState("");
   const [store, setStore] = useState<Store | null>(null);
   const [error, setError] = useState("");
+  const [loadedSession, setLoadedSession] = useState("");
   const [view, setView] = useState("home");
   const [adminView, setAdminView] = useState("overview");
   const [modal, setModal] = useState("");
@@ -105,7 +121,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
-  const sessionKey = `${auth.scope}:${auth.user?.uid || "guest"}:${auth.verified}:${auth.provider}`;
+  const sessionKey = `${auth.scope}:${auth.user?.uid || "guest"}:${auth.verified}:${auth.provider}:${branch}`;
   const activeSession = useRef(sessionKey);
   activeSession.current = sessionKey;
   const loadSequence = useRef(0);
@@ -113,7 +129,9 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
     const capturedSession = sessionKey;
     const sequence = ++loadSequence.current;
     try {
-      const r = await auth.request("/api/store", { cache: "no-store" });
+      const r = await auth.request(`/api/store?branch=${branch}`, {
+        cache: "no-store",
+      });
       if (!r.ok) throw Error("Data belum bisa dimuat");
       const data = await r.json();
       if (
@@ -122,6 +140,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
       )
         return;
       setStore(data);
+      setLoadedSession(capturedSession);
       setProfile({
         name: data.profile?.name || auth.name,
         phone: data.profile?.phone || "",
@@ -136,6 +155,8 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
     }
   }
   useEffect(() => {
+    setLoadedSession("");
+    setError("");
     setProfile({ name: auth.name, phone: "" });
     setStore((previous) =>
       previous
@@ -152,7 +173,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
     }
     const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
-  }, [auth.user?.uid, auth.verified, auth.provider, auth.name]);
+  }, [auth.user?.uid, auth.verified, auth.provider, branch]);
   useEffect(() => {
     setPublicOrder(null);
     setTrackingError("");
@@ -201,7 +222,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   async function action(action: string, data: unknown) {
     setBusy(true);
     try {
-      const r = await auth.request("/api/store", {
+      const r = await auth.request(`/api/store?branch=${branch}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, data }),
@@ -241,7 +262,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
     orders.find(
       (o) => o.token === track.trim() || o.id === track.trim().toUpperCase(),
     );
-  if (!store)
+  if (!store || loadedSession !== sessionKey || (dashboard && auth.loading))
     return (
       <main className="loading">
         <Brand />
@@ -266,14 +287,18 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 px-6 py-10">
         <Brand />
         <AccountPanel admin phone={profile.phone} onDone={() => load()} />
-        {auth.user && !store.isAdmin && (
-          <p
-            role="alert"
-            className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800"
-          >
-            Akun ini belum mendapat akses admin toko.
-          </p>
-        )}
+        {auth.user &&
+          auth.verified &&
+          auth.provider === "password" &&
+          loadedSession === sessionKey &&
+          !store.isAdmin && (
+            <p
+              role="alert"
+              className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800"
+            >
+              Akun ini belum mendapat akses admin toko.
+            </p>
+          )}
         <a href="/" className="text-sm text-indigo-600">
           Kembali ke web pelanggan
         </a>
@@ -283,13 +308,19 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   return (
     <>
       <div className="demo-bar">
-        {store.configured ? "D’FABLE CINERE" : "PREVIEW DESAIN"}{" "}
+        {store.configured
+          ? `D’FABLE ${branchName.toUpperCase()}`
+          : "PREVIEW DESAIN"}{" "}
         <span>
           {store.configured
             ? "Laundry Studio · Jemput & antar"
             : "Firebase belum dihubungkan · Transaksi belum aktif"}
         </span>
-        <a href={dashboard ? "/" : "/dashboard"}>
+        <a
+          href={
+            dashboard ? `/?branch=${branch}` : `/dashboard?branch=${branch}`
+          }
+        >
           {dashboard ? "Web pelanggan" : "Dashboard toko"}
         </a>
       </div>
@@ -297,23 +328,32 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
         <div className="admin-shell">
           <aside className="sidebar">
             <Brand />
-            <div className="branch-box">
-              <span className="branch-icon">
-                <MapPin size={18} />
-              </span>
-              <div>
-                <b>Cabang Cinere</b>
-                <small>Workspace toko</small>
-              </div>
-              <ChevronDown size={16} />
-            </div>
+            <label className="branch-box workspace-switch">
+              <MapPin size={18} aria-hidden="true" />
+              <span className="sr-only">Pilih workspace cabang</span>
+              <select
+                aria-label="Workspace cabang"
+                value={branch}
+                disabled={busy}
+                onChange={(e) => {
+                  setModal("");
+                  setSelected(null);
+                  setQuery("");
+                  setFilter("all");
+                  switchBranch(e.target.value as BranchId);
+                }}
+              >
+                <option value="cinere">Cabang Cinere</option>
+                <option value="bogor">Cabang Bogor</option>
+              </select>
+            </label>
             <span className="nav-caption">OPERASIONAL</span>
             {[
               ["overview", "Ringkasan", LayoutDashboard],
               ["orders", "Pesanan", ShoppingBag],
               ["pos", "Kasir / POS", ReceiptText],
               ["prices", "Layanan & harga", Tags],
-              ["promo", "Promosi", Megaphone],
+              ["promo", "Banner & promosi", Megaphone],
               ["users", "Pengguna & akses", ShieldCheck],
             ]
               .filter(
@@ -341,16 +381,6 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   </button>
                 );
               })}
-            <div className="sidebar-bottom">
-              <span className="avatar">DF</span>
-              <div>
-                <b>{auth.user?.displayName || "Preview admin"}</b>
-                <small>D’Fable Cinere</small>
-              </div>
-              <button onClick={() => auth.logout()} aria-label="Keluar akun">
-                <LogOut size={18} />
-              </button>
-            </div>
           </aside>
           <div className="admin-main">
             <header className="admin-top">
@@ -365,49 +395,50 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                         orders: "Pesanan",
                         pos: "Kasir",
                         prices: "Layanan & harga",
-                        promo: "Promosi",
+                        promo: "Banner & promosi",
                         users: "Pengguna & akses",
                       } as Record<string, string>
                     )[adminView]
                   }
                 </span>
               </span>
-              <button
-                aria-label="Keluar workspace"
-                onClick={() => auth.logout()}
-              >
-                <LogOut size={18} />
-              </button>
-              <span className="branch-pill">
-                <MapPin size={14} /> Cinere
-              </span>
+              <label className="mobile-workspace workspace-switch">
+                <span className="sr-only">Workspace cabang</span>
+                <select
+                  aria-label="Workspace cabang mobile"
+                  value={branch}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setModal("");
+                    setSelected(null);
+                    setQuery("");
+                    setFilter("all");
+                    switchBranch(e.target.value as BranchId);
+                  }}
+                >
+                  <option value="cinere">Cinere</option>
+                  <option value="bogor">Bogor</option>
+                </select>
+              </label>
+              <DashboardAccount branchName={branchName} />
             </header>
             <main className="admin-content">
               <div className="section-heading">
                 <div>
-                  <p className="eyebrow">RUANG KERJA TOKO</p>
                   <h1>
                     {adminView === "users"
-                      ? "Tim yang tepat, akses yang aman."
+                      ? "Pengguna & akses"
                       : adminView === "overview"
-                        ? "Semua dalam kendali."
+                        ? "Ringkasan"
                         : adminView === "orders"
                           ? "Kelola pesanan"
                           : adminView === "pos"
-                            ? "Pesanan langsung, tetap terhubung."
+                            ? "Kasir / POS"
                             : adminView === "prices"
                               ? "Layanan & harga"
-                              : "Cerita baru di beranda."}
+                              : "Banner & promosi"}
                   </h1>
-                  <p className="muted">
-                    {adminView === "overview"
-                      ? "Pantau aktivitas laundry dan perkembangan tokomu."
-                      : "Cabang Cinere · Kelola pesanan dan layanan."}
-                  </p>
                 </div>
-                <button className="primary" onClick={() => order()}>
-                  <Plus size={18} /> Pesanan baru
-                </button>
               </div>
               {adminView === "users" && store.canManageUsers && (
                 <UserManagement />
@@ -491,7 +522,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                     </section>
                     <section className="blue-note">
                       <Truck size={28} />
-                      <h3>Setiap update berarti.</h3>
+                      <h3>Status pesanan</h3>
                       <p>
                         Status yang kamu ubah akan langsung terlihat di halaman
                         tracking pelanggan.
@@ -632,7 +663,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                               <Icon service={s} />
                             </span>
                             <h3>{s.name}</h3>
-                            <p>{s.description}</p>
+
                             <b>
                               {money(s.price)}
                               <small> / kg</small>
@@ -669,13 +700,16 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                 />
               )}
               {adminView === "promo" && (
-                <PromoEditor
-                  store={store}
-                  save={async (data) => {
-                    await action("promo", data);
-                    notify("Promosi berhasil diperbarui");
-                  }}
-                />
+                <div className="banner-settings">
+                  <PromoEditor
+                    store={store}
+                    save={async (data) => {
+                      await action("promo", data);
+                      notify("Promosi berhasil diperbarui");
+                    }}
+                  />
+                  <ContentEditor key={branch} store={store} onSaved={load} />
+                </div>
               )}
             </main>
           </div>
@@ -700,16 +734,17 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
               ))}
             </nav>
             <div className="header-right">
-              <button
-                className="branch-pill"
-                onClick={() =>
-                  notify(
-                    "Demo tersedia untuk cabang Cinere. Cabang lain dapat ditambahkan berikutnya.",
-                  )
-                }
-              >
-                <MapPin size={15} /> Cinere <ChevronDown size={13} />
-              </button>
+              <label className="customer-branch-select">
+                <span className="sr-only">Cabang laundry</span>
+                <select
+                  aria-label="Cabang laundry"
+                  value={branch}
+                  onChange={(e) => switchBranch(e.target.value as BranchId)}
+                >
+                  <option value="cinere">Cinere</option>
+                  <option value="bogor">Bogor</option>
+                </select>
+              </label>
               <button
                 className="account-button"
                 aria-label="Buka profil pelanggan"
@@ -745,14 +780,9 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
               <section className="services-section">
                 <div className="section-heading">
                   <div>
-                    <p className="eyebrow">A LITTLE CARE GOES A LONG WAY</p>
-                    <h2>
-                      {view === "services"
-                        ? "Perawatan yang pas untukmu."
-                        : "Pilih layanan, sisanya serahkan kami."}
-                    </h2>
+                    <h2>Layanan & harga</h2>
                   </div>
-                  <span className="small-note">Cabang Cinere</span>
+                  <span className="small-note">Cabang {branchName}</span>
                 </div>
                 <div className="service-grid">
                   {store.services.map((s, i) => (
@@ -772,7 +802,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                         )}
                       </div>
                       <h3>{s.name}</h3>
-                      <p>{s.description}</p>
+
                       <div className="service-price">
                         <strong>
                           {money(s.id === "wash" ? s.price * 10 : s.price)}
@@ -810,11 +840,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
             )}
             {view === "tracking" && (
               <section className="tracking-page">
-                <p className="eyebrow">YOUR LAUNDRY, EVERY STEP</p>
-                <h1>Sudah sampai mana?</h1>
-                <p className="muted">
-                  Pantau perjalanan cucianmu dari jemput sampai kembali.
-                </p>
+                <h1>Lacak pesanan</h1>
                 <form
                   className="track-search"
                   onSubmit={(e) => {
@@ -852,7 +878,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   />
                 ) : (
                   <Empty
-                    title="Semua perjalanan punya cerita."
+                    title="Belum ada pesanan"
                     text="Masukkan nomor pesanan untuk melihat status terbaru cucianmu."
                   />
                 )}
@@ -882,9 +908,9 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
           </main>
           <footer>
             <Brand />
-            <p>Merawat pakaian. Meringankan harimu.</p>
+
             <span>
-              © {new Date().getFullYear()} D’Fable Laundry Studio · Cinere
+              © {new Date().getFullYear()} D’Fable Laundry Studio · {branchName}
             </span>
           </footer>
           <nav className="mobile-nav">
@@ -936,6 +962,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
         </button>
         {modal === "order" && (
           <OrderForm
+            branchName={branchName}
             services={store.services}
             initialService={service}
             profile={profile}
@@ -1010,7 +1037,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
               <Layers />
             </span>
             <p className="eyebrow">D’FABLE MONTHLY</p>
-            <h2>Rutinitas bersih, lebih praktis.</h2>
+            <h2>Paket bulanan</h2>
             <p className="muted">
               Paket demo{" "}
               {money(store.services.find((s) => s.id === "member")!.price)} / 30
@@ -1063,6 +1090,7 @@ function Empty({ title, text }: { title: string; text: string }) {
   );
 }
 function OrderForm({
+  branchName,
   services,
   initialService,
   profile,
@@ -1070,6 +1098,7 @@ function OrderForm({
   busy,
   submit,
 }: {
+  branchName: string;
   services: Service[];
   initialService: string;
   profile: { name: string; phone: string };
@@ -1090,7 +1119,7 @@ function OrderForm({
   const [form, setForm] = useState({
     name: pos ? "" : profile.name,
     phone: pos ? "" : profile.phone,
-    address: pos ? "Datang langsung — D’Fable Cinere" : "",
+    address: pos ? `Datang langsung — D’Fable ${branchName}` : "",
     date: today(),
     slot: "09.00–12.00",
     notes: "",
@@ -1560,7 +1589,7 @@ function PriceEditor({
         }
       }}
     >
-      <h3>Harga layanan cabang Cinere</h3>
+      <h3>Harga layanan cabang {branches[store.branchId || "cinere"]}</h3>
       <p className="muted">
         Cuci-kering ditagih minimal 10 kg. Paket lengkap = cuci-kering + selisih
         tarif lengkap per kg untuk setrika.
@@ -1610,6 +1639,7 @@ function PromoEditor({
             title: f.get("title"),
             description: f.get("description"),
             code: f.get("code"),
+            button: f.get("button"),
             active: f.get("active") === "on",
           });
           setMsg("Banner berhasil diperbarui di beranda pelanggan.");
@@ -1637,6 +1667,15 @@ function PromoEditor({
           name="description"
           maxLength={220}
           defaultValue={store.promo.description}
+        />
+      </label>
+      <label>
+        Teks tombol
+        <input
+          name="button"
+          required
+          maxLength={35}
+          defaultValue={store.promo.button || "Jemput sekarang"}
         />
       </label>
       <label>
