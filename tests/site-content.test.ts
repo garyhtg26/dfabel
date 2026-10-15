@@ -47,7 +47,13 @@ test("content writes cannot inject arbitrary photo URLs or unknown fields", () =
   );
 });
 
-import { requestBranch, branchMediaPath } from "../lib/branches";
+import {
+  requestBranch,
+  branchMediaPath,
+  branchLocations,
+  nearestBranch,
+  resolveCustomerBranch,
+} from "../lib/branches";
 test("branch requests reject unknown workspaces and keep banner storage isolated", () => {
   assert.equal(requestBranch("https://example.com/api/store"), "cinere");
   assert.equal(
@@ -70,4 +76,42 @@ test("branch requests reject unknown workspaces and keep banner storage isolated
     ),
     "/api/media/banners/promo?v=abcd&branch=bogor",
   );
+});
+
+test("visitor coordinates select the nearest available branch", () => {
+  assert.equal(
+    nearestBranch(
+      branchLocations.cinere.latitude,
+      branchLocations.cinere.longitude,
+    ),
+    "cinere",
+  );
+  assert.equal(
+    nearestBranch(
+      branchLocations.bogor.latitude,
+      branchLocations.bogor.longitude,
+    ),
+    "bogor",
+  );
+});
+
+test("current visitor location takes priority over URL and saved branch", () => {
+  assert.equal(
+    resolveCustomerBranch({
+      detected: branchLocations.bogor,
+      requested: "cinere",
+      saved: "cinere",
+    }),
+    "bogor",
+  );
+  assert.equal(
+    resolveCustomerBranch({
+      detected: branchLocations.cinere,
+      requested: "bogor",
+      saved: "bogor",
+    }),
+    "cinere",
+  );
+  assert.equal(resolveCustomerBranch({ saved: "bogor" }), "bogor");
+  assert.equal(resolveCustomerBranch({ saved: "unknown" }), "cinere");
 });

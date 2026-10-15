@@ -1,6 +1,5 @@
 "use client";
 
-import { branches } from "@/lib/branches";
 import { useState } from "react";
 import Image from "next/image";
 import {
@@ -13,8 +12,6 @@ import {
   Package,
   Truck,
   Clock,
-  MapPin,
-  ChevronDown,
   Search,
   User,
   Check,
@@ -77,13 +74,6 @@ export default function CustomerHome({
         >
           <User size={23} />
         </button>
-        <div className="studio-location">
-          <MapPin size={18} />
-          <div>
-            <strong>D’Fable {branches[store.branchId || "cinere"]}</strong>
-          </div>
-          <ChevronDown size={16} />
-        </div>
       </div>
 
       <section
@@ -102,9 +92,7 @@ export default function CustomerHome({
               className="campaign-photo"
             />
             <div className="campaign-copy">
-              <span className="campaign-kicker">
-                PROMO PILIHAN {!store.configured && <span>DEMO</span>}
-              </span>
+              <span className="campaign-kicker">PROMO PILIHAN</span>
               <h2>{store.promo.title}</h2>
               <p className="campaign-price">
                 <span>{store.promo.description}</span>
@@ -211,23 +199,38 @@ export default function CustomerHome({
             </button>
           ))}
           {category === "member" && content.member.active && (
-            <button className="membership-feature" onClick={onMember}>
-              <img
-                className="membership-image"
-                src={siteImage(content, "member")}
-                alt="Paket bulanan"
-              />
-              <Layers size={34} />
-
-              <h3>{content.member.title}</h3>
-              <strong>
-                {money(member.price)}
-                <small> / bulan</small>
-              </strong>
-              <p>30 kg · 30 hari · Paket demo</p>
-              <span className="membership-link">
-                {content.member.button} <Plus size={18} />
-              </span>
+            <button
+              className="photo-service membership-feature"
+              onClick={onMember}
+            >
+              <div className="photo-service-image">
+                <Image
+                  width={1536}
+                  height={1024}
+                  sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
+                  unoptimized
+                  src={siteImage(content, "member")}
+                  alt="Paket bulanan"
+                />
+                <span className="photo-service-tag">Paket bulanan</span>
+                <span className="photo-service-add">
+                  <Plus size={20} />
+                </span>
+              </div>
+              <div className="photo-service-info">
+                <h3>{content.member.title}</h3>
+                <div>
+                  <strong>{money(member.price)}</strong>
+                  <small> / bulan</small>
+                </div>
+                <p>
+                  <Layers size={14} />
+                  30 kg
+                  <span />
+                  <Clock size={14} />
+                  30 hari
+                </p>
+              </div>
             </button>
           )}
         </div>
@@ -268,17 +271,22 @@ export default function CustomerHome({
         )}
         {content.member.active && (
           <button className="monthly-strip" onClick={onMember}>
-            <img
+            <Image
+              width={120}
+              height={120}
+              unoptimized
               className="monthly-thumb"
               src={siteImage(content, "member")}
               alt="Paket bulanan"
             />
-            <div>
-              <span>D’FABLE MONTHLY</span>
+            <div className="monthly-copy">
+              <span className="monthly-kicker">D’FABLE MONTHLY</span>
               <h3>{content.member.title}</h3>
             </div>
-            <span className="monthly-action">{content.member.button}</span>
-            <Plus size={21} />
+            <span className="monthly-action">
+              <span>{content.member.button}</span>
+              <Plus size={18} aria-hidden="true" />
+            </span>
           </button>
         )}
       </div>

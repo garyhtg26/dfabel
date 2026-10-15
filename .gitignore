@@ -7,3 +7,5 @@ data/
 .vercel/
 *service-account*.json
 *-firebase-adminsdk-*.json
+.codex-presentation/
+proposal-output/

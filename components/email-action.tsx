@@ -249,7 +249,7 @@ export default function EmailAction({
           </div>
         </section>
       </div>
-      <footer className="email-footer">D’Fable Laundry Studio · Cinere</footer>
+      <footer className="email-footer">D’Fable Laundry Studio</footer>
     </main>
   );
 }

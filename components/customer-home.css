@@ -24,33 +24,6 @@
 .welcome-account {
   display: none;
 }
-.studio-location {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 12px 17px;
-  border: 1px solid #e9ebf3;
-  border-radius: 13px;
-  background: #fff;
-}
-.studio-location > svg:first-child {
-  color: var(--fresh-blue);
-}
-.studio-location small {
-  display: block;
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  color: #9497a7;
-  margin-bottom: 2px;
-}
-.studio-location strong {
-  font-size: 13px;
-  font-weight: 600;
-}
-.studio-location > svg:last-child {
-  margin-left: 20px;
-  color: #9b9eac;
-}
 .campaign-grid {
   display: grid;
   grid-template-columns: 1.23fr 1fr;
@@ -418,44 +391,10 @@
   margin: 14px 0 0;
 }
 .membership-feature {
-  grid-column: span 2;
-  padding: 29px;
-  text-align: left;
-  position: relative;
-  min-height: 300px;
-  background: #eceefe;
-  color: #3530a6;
-  border-radius: 18px;
-  overflow: hidden;
+  grid-column: auto;
 }
-.membership-feature > svg {
-  float: right;
-}
-.membership-feature > span:first-of-type {
-  font-size: 10px;
-  letter-spacing: 0.12em;
-}
-.membership-feature h3 {
-  font-size: 34px;
-  margin: 18px 0;
-}
-.membership-feature > strong {
-  font-size: 26px;
-}
-.membership-feature small {
-  font-weight: 400;
-  font-size: 13px;
-}
-.membership-feature p {
-  font-size: 13px;
-  color: #7a7baf;
-  margin-top: 8px;
-}
-.membership-link {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 13px;
+.membership-feature .photo-service-image > img {
+  object-position: center 55%;
 }
 .customer-bottom-grid {
   display: grid;
@@ -531,31 +470,63 @@
 }
 .monthly-strip {
   border: 1px solid #e1e3f9;
-  background: #ededfc;
-  display: flex;
+  background: linear-gradient(135deg, #f5f5ff 0%, #ececfc 100%);
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 14px;
-  padding: 23px;
+  gap: 13px;
+  width: 100%;
+  min-width: 0;
+  padding: 18px;
   border-radius: 16px;
   color: #554ec0;
   text-align: left;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 }
-.monthly-strip > svg:first-child {
-  flex-shrink: 0;
+.monthly-strip:hover {
+  transform: translateY(-2px);
+  border-color: #cbc9f5;
+  box-shadow: 0 14px 28px rgba(55, 53, 104, 0.11);
 }
-.monthly-strip > svg:last-child {
-  margin-left: auto;
-  flex-shrink: 0;
+.monthly-copy {
+  min-width: 0;
 }
-.monthly-strip span {
+.monthly-kicker {
+  display: block;
   font-size: 9px;
+  line-height: 1.2;
   letter-spacing: 0.12em;
+  color: #6963c9;
 }
 .monthly-strip h3 {
   font-size: 16px;
+  line-height: 1.25;
   letter-spacing: -0.03em;
-  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  margin: 5px 0 0;
   color: #373568;
+}
+.monthly-strip .monthly-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 11px;
+  border: 1px solid rgba(38, 33, 223, 0.11);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--fresh-blue);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.monthly-action svg {
+  flex-shrink: 0;
 }
 .care-signoff {
   display: flex;
@@ -617,7 +588,7 @@
     font-size: 15px;
   }
   .customer-bottom-grid {
-    grid-template-columns: 1.3fr 1fr;
+    grid-template-columns: 1fr;
   }
   .tracking-ribbon form {
     flex-basis: 100%;
@@ -734,15 +705,9 @@
   .care-signoff > b {
     display: none;
   }
-  .studio-location {
-    padding: 10px 13px;
-  }
-  .studio-location > svg:last-child {
-    margin-left: 4px;
-  }
   .monthly-strip {
-    padding: 20px;
-    gap: 10px;
+    padding: 17px;
+    gap: 12px;
   }
   .monthly-strip h3 {
     font-size: 15px;
@@ -796,9 +761,6 @@
     border-radius: 50%;
     width: 42px;
     height: 42px;
-  }
-  .studio-location {
-    display: none;
   }
   .campaign-grid {
     display: flex;
@@ -1017,10 +979,20 @@
     padding: 12px 0;
   }
   .monthly-strip {
-    padding: 21px;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    gap: 11px;
+    padding: 16px;
   }
   .monthly-strip h3 {
-    font-size: 16px;
+    font-size: 15px;
+  }
+  .monthly-strip .monthly-action {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+  }
+  .monthly-action > span {
+    display: none;
   }
   .care-signoff {
     padding-top: 24px;
@@ -1043,21 +1015,21 @@
     padding-top: 12px;
     box-shadow: 0 -5px 20px #20255d04;
   }
-  .mobile-nav button {
+  .mobile-nav :is(button, a) {
     font-size: 10px;
     gap: 7px;
     position: relative;
-    min-width: 60px;
+    min-width: 50px;
     padding: 3px 6px;
   }
-  .mobile-nav button > svg {
+  .mobile-nav :is(button, a) > svg {
     width: 22px;
     height: 22px;
   }
-  .mobile-nav button.active {
+  .mobile-nav :is(button, a).active {
     font-weight: 650;
   }
-  .mobile-nav button.active > svg {
+  .mobile-nav :is(button, a).active > svg {
     background: var(--fresh-blue, #2621da);
     color: #fff;
     border-radius: 12px;
@@ -1065,9 +1037,6 @@
     padding: 10px;
     margin-top: -17px;
     box-shadow: 0 4px 12px #2621da30;
-  }
-  .membership-feature {
-    min-height: 300px;
   }
   .no-campaign .people-feature {
     margin-top: 0;
@@ -1099,18 +1068,6 @@
   border-radius: 12px;
   object-fit: cover;
   flex-shrink: 0;
-}
-.monthly-strip .monthly-action {
-  margin-left: auto;
-  font-size: 11px;
-  text-align: right;
-}
-.membership-feature .membership-image {
-  width: 100%;
-  height: 160px;
-  object-fit: cover;
-  border-radius: 14px;
-  margin-bottom: 18px;
 }
 @media (max-width: 600px) {
   .monthly-thumb {

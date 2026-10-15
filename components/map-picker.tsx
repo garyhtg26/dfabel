@@ -4,6 +4,7 @@ import {
   APIProvider,
   Map,
   AdvancedMarker,
+  Marker,
   useMap,
   useMapsLibrary,
 } from "@vis.gl/react-google-maps";
@@ -81,6 +82,7 @@ export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const marker = useRef<import("leaflet").CircleMarker | null>(null);
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  const googleMapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
   useEffect(() => {
     if (key || !ref.current) return;
     let disposed = false;
@@ -155,7 +157,7 @@ export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
             <Map
               defaultCenter={{ lat, lng }}
               defaultZoom={14}
-              mapId="DEMO_MAP_ID"
+              mapId={googleMapId}
               disableDefaultUI
               zoomControl
               gestureHandling="cooperative"
@@ -164,13 +166,23 @@ export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
                   onChange(e.detail.latLng.lat, e.detail.latLng.lng);
               }}
             >
-              <AdvancedMarker
-                position={{ lat, lng }}
-                draggable
-                onDragEnd={(e) => {
-                  if (e.latLng) onChange(e.latLng.lat(), e.latLng.lng());
-                }}
-              />
+              {googleMapId ? (
+                <AdvancedMarker
+                  position={{ lat, lng }}
+                  draggable
+                  onDragEnd={(e) => {
+                    if (e.latLng) onChange(e.latLng.lat(), e.latLng.lng());
+                  }}
+                />
+              ) : (
+                <Marker
+                  position={{ lat, lng }}
+                  draggable
+                  onDragEnd={(e) => {
+                    if (e.latLng) onChange(e.latLng.lat(), e.latLng.lng());
+                  }}
+                />
+              )}
               <FollowPin lat={lat} lng={lng} />
             </Map>
             {locate}

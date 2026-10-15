@@ -93,30 +93,6 @@ img {
 .muted {
   color: var(--muted);
 }
-.demo-bar {
-  background: #f0f1fa;
-  color: #565a7c;
-  min-height: 29px;
-  padding: 5px 5%;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-.demo-bar span {
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0;
-}
-.demo-bar a {
-  margin-left: auto;
-  font-size: 11px;
-  letter-spacing: 0;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
 .brand {
   display: block;
   width: 162px;
@@ -142,18 +118,20 @@ img {
   height: 100%;
   align-items: center;
 }
-.customer-header nav button {
+.customer-header nav :is(button, a) {
+  display: inline-flex;
+  align-items: center;
   font-size: 14px;
   color: #737680;
   height: 100%;
   padding: 0;
   position: relative;
 }
-.customer-header nav button.active {
+.customer-header nav :is(button, a).active {
   color: var(--blue);
   font-weight: 650;
 }
-.customer-header nav button.active:after {
+.customer-header nav :is(button, a).active:after {
   content: "";
   position: absolute;
   bottom: 21px;
@@ -1311,6 +1289,33 @@ label > small {
   color: var(--blue);
   border-bottom: 2px solid var(--blue);
 }
+.order-branch-field {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  margin-bottom: 18px;
+  border: 1px solid #dedcfb;
+  border-radius: 11px;
+  background: #f8f7ff;
+}
+.order-branch-field > svg {
+  width: 38px;
+  height: 38px;
+  padding: 9px;
+  border-radius: 10px;
+  background: #e9e7ff;
+  color: var(--blue);
+}
+.order-branch-field label {
+  margin: 0;
+}
+.order-branch-field select {
+  margin-top: 6px;
+  border-color: #d5d2fa;
+  font-weight: 600;
+}
 .choice-services {
   display: flex;
   flex-direction: column;
@@ -1730,14 +1735,6 @@ label > small {
   }
 }
 @media (max-width: 800px) {
-  .demo-bar span {
-    font-size: 9px;
-  }
-  .demo-bar {
-    font-size: 8px;
-    padding: 5px 20px;
-    gap: 8px;
-  }
   .customer-header {
     height: 75px;
     padding: 0 22px;
@@ -1880,7 +1877,7 @@ label > small {
     padding: 10px 18px calc(9px + env(safe-area-inset-bottom));
     justify-content: space-around;
   }
-  .mobile-nav button {
+  .mobile-nav :is(button, a) {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -1973,17 +1970,6 @@ label > small {
   }
 }
 @media (max-width: 520px) {
-  .demo-bar {
-    padding: 5px 16px;
-  }
-  .demo-bar > span {
-    max-width: 170px;
-    font-size: 8px;
-    line-height: 1.4;
-  }
-  .demo-bar > a {
-    font-size: 9px;
-  }
   .customer-header {
     padding: 0 18px;
     height: 73px;
@@ -2442,7 +2428,7 @@ label > small {
 label,
 .primary,
 .secondary,
-.customer-header nav button,
+.customer-header nav :is(button, a),
 .account-button,
 .side-link,
 .tabs button,
@@ -2579,7 +2565,7 @@ label > small,
   .form-two label {
     margin-top: 12px;
   }
-  .mobile-nav button {
+  .mobile-nav :is(button, a) {
     font-size: 12px;
   }
 }

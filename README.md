@@ -67,7 +67,7 @@ Membership is still an explicitly labelled draft package, with no automatic acti
 
 ## Google Maps
 
-The app uses Google Maps when `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is present, with draggable pin, click-to-place, device location and Places (New) address search. Enable **Maps JavaScript API + Places API (New)** and billing, restrict the key to these APIs and your app domains. Without a key the picker uses OpenStreetMap/Leaflet. Geolocation requires HTTPS in production and browser permission. API permission/billing failures remain visible to the user.
+The app uses Google Maps when `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is present, with draggable pin, click-to-place, device location and Places (New) address search. Enable **Maps JavaScript API + Places API (New)** and billing, restrict the key to these APIs and your app domains. `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` is optional and enables the modern marker when a production Map ID is available. Without an API key the picker uses OpenStreetMap/Leaflet. Geolocation requires HTTPS in production and browser permission. API permission/billing failures remain visible to the user.
 
 - https://developers.google.com/maps/documentation/javascript/get-api-key
 - https://developers.google.com/maps/documentation/javascript/place-autocomplete-new

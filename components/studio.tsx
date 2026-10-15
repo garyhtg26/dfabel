@@ -1,12 +1,20 @@
 "use client";
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import CustomerHome from "./customer-home";
 import { useAuth } from "./auth-provider";
 import AccountPanel from "./account-panel";
 import UserManagement from "./user-management";
 import DashboardAccount from "./dashboard-account";
-import { branches, type BranchId } from "@/lib/branches";
+import {
+  branches,
+  branchLocations,
+  isBranchId,
+  nearestBranch,
+  resolveCustomerBranch,
+  type BranchId,
+} from "@/lib/branches";
 import ContentEditor from "./content-editor";
 import Tracking, { previewTracking } from "./tracking";
 import AuthorizedPhoto from "./authorized-photo";
@@ -45,6 +53,7 @@ import {
   Headphones,
   Layers,
   ShieldCheck,
+  Store as StoreIcon,
 } from "lucide-react";
 import {
   money,
@@ -63,6 +72,7 @@ const icons = {
   iron: Wind,
   member: Layers,
 };
+const CUSTOMER_BRANCH_KEY = "dfable-customer-branch";
 const today = () =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(
     new Date(),
@@ -92,15 +102,63 @@ function Icon({ service, size = 25 }: { service: Service; size?: number }) {
 export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   const auth = useAuth();
   const [branch, setBranch] = useState<BranchId>("cinere");
+  const [visitorLocation, setVisitorLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const geolocationStarted = useRef(false);
+  const manualBranchSelected = useRef(false);
   const branchName = branches[branch];
   useEffect(() => {
-    const initial = new URLSearchParams(window.location.search).get("branch");
-    if (initial === "bogor" || initial === "cinere") setBranch(initial);
-  }, []);
-  function switchBranch(next: BranchId) {
+    const requested = new URLSearchParams(window.location.search).get("branch");
+    let saved: string | null = null;
+    try {
+      saved = window.localStorage.getItem(CUSTOMER_BRANCH_KEY);
+    } catch {
+      // Storage can be unavailable in strict privacy modes.
+    }
+    if (dashboard) {
+      if (isBranchId(requested)) setBranch(requested);
+      return;
+    }
+    setBranch(resolveCustomerBranch({ requested, saved }));
+    if (geolocationStarted.current || !navigator.geolocation) return;
+    geolocationStarted.current = true;
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const point = {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        };
+        setVisitorLocation(point);
+        if (!manualBranchSelected.current)
+          switchBranch(
+            resolveCustomerBranch({ detected: point, requested, saved }),
+            false,
+          );
+      },
+      () => {
+        // Manual selection remains available when location permission is denied.
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 0,
+      },
+    );
+  }, [dashboard]);
+  function switchBranch(next: BranchId, remember = !dashboard) {
     const url = new URL(window.location.href);
     url.searchParams.set("branch", next);
     window.history.replaceState(window.history.state, "", url);
+    if (remember) {
+      manualBranchSelected.current = true;
+      try {
+        window.localStorage.setItem(CUSTOMER_BRANCH_KEY, next);
+      } catch {
+        // A remembered branch is an enhancement; switching still works without it.
+      }
+    }
     setBranch(next);
   }
   const pendingOrder = useRef(false);
@@ -166,6 +224,13 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
     load();
     const params = new URLSearchParams(location.search);
     if (params.get("account") === "1" && !dashboard) setModal("login");
+    const requestedView = params.get("view");
+    if (
+      !dashboard &&
+      requestedView &&
+      ["home", "services", "tracking"].includes(requestedView)
+    )
+      setView(requestedView);
     const q = params.get("track");
     if (q) {
       setTrack(q);
@@ -287,43 +352,11 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 px-6 py-10">
         <Brand />
         <AccountPanel admin phone={profile.phone} onDone={() => load()} />
-        {auth.user &&
-          auth.verified &&
-          auth.provider === "password" &&
-          loadedSession === sessionKey &&
-          !store.isAdmin && (
-            <p
-              role="alert"
-              className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800"
-            >
-              Akun ini belum mendapat akses admin toko.
-            </p>
-          )}
-        <a href="/" className="text-sm text-indigo-600">
-          Kembali ke web pelanggan
-        </a>
       </main>
     );
   const revenue = orders.filter((o) => o.paid).reduce((a, o) => a + o.total, 0);
   return (
     <>
-      <div className="demo-bar">
-        {store.configured
-          ? `D’FABLE ${branchName.toUpperCase()}`
-          : "PREVIEW DESAIN"}{" "}
-        <span>
-          {store.configured
-            ? "Laundry Studio · Jemput & antar"
-            : "Firebase belum dihubungkan · Transaksi belum aktif"}
-        </span>
-        <a
-          href={
-            dashboard ? `/?branch=${branch}` : `/dashboard?branch=${branch}`
-          }
-        >
-          {dashboard ? "Web pelanggan" : "Dashboard toko"}
-        </a>
-      </div>
       {dashboard ? (
         <div className="admin-shell">
           <aside className="sidebar">
@@ -732,6 +765,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   {t}
                 </button>
               ))}
+              <Link href="/tentang">Tentang D’Fable</Link>
             </nav>
             <div className="header-right">
               <label className="customer-branch-select">
@@ -908,10 +942,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
           </main>
           <footer>
             <Brand />
-
-            <span>
-              © {new Date().getFullYear()} D’Fable Laundry Studio · {branchName}
-            </span>
+            <span>© {new Date().getFullYear()} D’Fable Laundry Studio</span>
           </footer>
           <nav className="mobile-nav">
             {[
@@ -931,6 +962,10 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                 </button>
               );
             })}
+            <Link href="/tentang">
+              <StoreIcon size={20} />
+              Tentang
+            </Link>
             <button onClick={() => setModal("login")}>
               <User size={20} />
               Akun
@@ -962,7 +997,16 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
         </button>
         {modal === "order" && (
           <OrderForm
+            branchId={branch}
             branchName={branchName}
+            initialLocation={visitorLocation || branchLocations[branch]}
+            onBranchChange={(next) => switchBranch(next, !dashboard)}
+            onPickupLocationChange={(latitude, longitude) => {
+              const point = { latitude, longitude };
+              setVisitorLocation(point);
+              if (!manualBranchSelected.current)
+                switchBranch(nearestBranch(latitude, longitude), false);
+            }}
             services={store.services}
             initialService={service}
             profile={profile}
@@ -988,7 +1032,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
             <h2>Selangkah menuju bersih.</h2>
             <p>
               Nomor pesanan kamu <b>{selected.id}</b>. Toko akan mengonfirmasi
-              jadwal dan biaya antar-jemput.
+              jadwal dan biaya antar-jemput melalui D’Fable {branchName}.
             </p>
             <div className="total-line">
               <span>Estimasi layanan</span>
@@ -1039,14 +1083,14 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
             <p className="eyebrow">D’FABLE MONTHLY</p>
             <h2>Paket bulanan</h2>
             <p className="muted">
-              Paket demo{" "}
               {money(store.services.find((s) => s.id === "member")!.price)} / 30
-              hari untuk 30 kg cuci-kering regular. Aktivasi, sisa kuota, dan
-              penagihan membership belum tersedia di tahap demo ini.
+              hari untuk 30 kg cuci-kering regular. Detail aktivasi dan
+              penggunaan paket akan dikonfirmasi oleh tim D’Fable melalui
+              WhatsApp.
             </p>
             <div className="notice">
-              <Info size={20} /> Paket ini masih rancangan dan perlu disetujui
-              toko.
+              <Info size={20} /> Tim toko akan memastikan kuota dan masa aktif
+              sebelum paket dimulai.
             </div>
             <button
               className="primary"
@@ -1090,7 +1134,11 @@ function Empty({ title, text }: { title: string; text: string }) {
   );
 }
 function OrderForm({
+  branchId,
   branchName,
+  initialLocation,
+  onBranchChange,
+  onPickupLocationChange,
   services,
   initialService,
   profile,
@@ -1098,7 +1146,11 @@ function OrderForm({
   busy,
   submit,
 }: {
+  branchId: BranchId;
   branchName: string;
+  initialLocation: { latitude: number; longitude: number };
+  onBranchChange: (branch: BranchId) => void;
+  onPickupLocationChange: (latitude: number, longitude: number) => void;
   services: Service[];
   initialService: string;
   profile: { name: string; phone: string };
@@ -1111,8 +1163,9 @@ function OrderForm({
   const [service, setService] = useState(initialService);
   const [kg, setKg] = useState(5);
   const [express, setExpress] = useState(false);
-  const [lat, setLat] = useState(-6.3286);
-  const [lng, setLng] = useState(106.7844);
+  const [lat, setLat] = useState(initialLocation.latitude);
+  const [lng, setLng] = useState(initialLocation.longitude);
+  const pickupLocationEdited = useRef(false);
   const [photo, setPhoto] = useState("");
   const [error, setError] = useState("");
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -1126,6 +1179,11 @@ function OrderForm({
   });
   const set = (key: string, value: string) =>
     setForm((p) => ({ ...p, [key]: value }));
+  useEffect(() => {
+    if (pickupLocationEdited.current) return;
+    setLat(initialLocation.latitude);
+    setLng(initialLocation.longitude);
+  }, [initialLocation.latitude, initialLocation.longitude]);
   async function photoRead(file?: File) {
     if (!file) return;
     if (
@@ -1179,7 +1237,7 @@ function OrderForm({
       }}
     >
       <p className="eyebrow">
-        {pos ? "KASIR · CABANG CINERE" : "A FRESH START"}
+        {pos ? `KASIR · CABANG ${branchName.toUpperCase()}` : "A FRESH START"}
       </p>
       <h2>{step === 1 ? "Cucianmu butuh apa?" : "Ke mana kami menjemput?"}</h2>
       <div className="form-steps">
@@ -1188,6 +1246,28 @@ function OrderForm({
           02 {pos ? "Data pelanggan" : "Jadwal & alamat"}
         </span>
       </div>
+      {!pos && (
+        <div className="order-branch-field">
+          <MapPin size={21} aria-hidden="true" />
+          <label>
+            Cabang pelayanan
+            <select
+              aria-label="Cabang pelayanan"
+              value={branchId}
+              onChange={(event) =>
+                onBranchChange(event.target.value as BranchId)
+              }
+            >
+              <option value="cinere">D’Fable Cinere</option>
+              <option value="bogor">D’Fable Bogor</option>
+            </select>
+            <small>
+              Cabang terdekat dari titik jemput dipilih otomatis. Kamu tetap
+              bisa menggantinya sebelum memesan.
+            </small>
+          </label>
+        </div>
+      )}
       {step === 1 ? (
         <>
           <div className="choice-services">
@@ -1337,8 +1417,10 @@ function OrderForm({
                 lng={lng}
                 onAddress={(address) => set("address", address)}
                 onChange={(a, b) => {
+                  pickupLocationEdited.current = true;
                   setLat(a);
                   setLng(b);
+                  onPickupLocationChange(a, b);
                 }}
               />
               <label>
