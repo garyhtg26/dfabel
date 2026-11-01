@@ -50,3 +50,36 @@ if (
 console.log(
   "Configuration structure passes. This does not verify Firebase permissions, APIs, deployed rules or live authentication.",
 );
+const midtransKey = process.env.MIDTRANS_SERVER_KEY?.trim();
+const midtransMode = process.env.MIDTRANS_IS_PRODUCTION?.trim() || "false";
+const midtransCheckout = process.env.MIDTRANS_QRIS_ENABLED?.trim() || "false";
+if (!["true", "false"].includes(midtransCheckout)) {
+  console.error("MIDTRANS_QRIS_ENABLED must be true or false.");
+  process.exit(1);
+}
+if (!["true", "false"].includes(midtransMode)) {
+  console.error("MIDTRANS_IS_PRODUCTION must be true or false.");
+  process.exit(1);
+}
+if (!midtransKey) {
+  console.log(
+    "QRIS is disabled: add MIDTRANS_SERVER_KEY and explicitly set MIDTRANS_QRIS_ENABLED=true when the merchant is ready.",
+  );
+} else if (
+  midtransMode === "false" &&
+  !/^SB-Mid-server-\S+$/.test(midtransKey)
+) {
+  console.error("Sandbox mode requires a Midtrans Sandbox Server Key.");
+  process.exit(1);
+} else if (midtransMode === "true" && !/^Mid-server-\S+$/.test(midtransKey)) {
+  console.error("Production mode requires a Midtrans Production Server Key.");
+  process.exit(1);
+} else {
+  console.log(
+    `Midtrans ${midtransMode === "true" ? "production" : "sandbox"} configuration detected. Merchant activation and live payment are not verified.`,
+  );
+}
+if (midtransCheckout === "false")
+  console.log(
+    "QRIS checkout is coming soon. Manual transfer settings are managed by owner/admin in the dashboard.",
+  );

@@ -5,12 +5,20 @@ import { siteContent } from "./site-content";
 import { defaultStore } from "./defaults";
 import type { Identity } from "./firebase/access";
 import type { Order, Store } from "./types";
+import { midtransCheckoutEnabled } from "./payments/midtrans";
+import { bankDetails, safeManualSummary } from "./payments/manual-policy";
+import { normalizeServices } from "./catalog";
 export async function readStore(
   user: Identity | null,
   branch: BranchId = "cinere",
 ): Promise<Store> {
   if (!firebaseReady())
-    return { ...defaultStore, configured: false, isAdmin: false };
+    return {
+      ...defaultStore,
+      configured: false,
+      isAdmin: false,
+      paymentEnabled: false,
+    };
   const database = db();
   const settings = await database.doc(`settings/${branch}`).get();
   const data = settings.exists ? settings.data()! : defaultStore;
@@ -37,7 +45,13 @@ export async function readStore(
       .map((d) => {
         const o = d.data() as Order;
         const { photoPath, ...rest } = o;
-        return { ...rest, photo: photoPath ? `/api/orders/${o.id}/photo` : "" };
+        return {
+          ...rest,
+          ...(o.manualPayment
+            ? { manualPayment: safeManualSummary(o.manualPayment) }
+            : {}),
+          photo: photoPath ? `/api/orders/${o.id}/photo` : "",
+        };
       });
     if (p.exists)
       profile = {
@@ -48,7 +62,7 @@ export async function readStore(
   }
   return {
     branchId: branch,
-    services: data.services || defaultStore.services,
+    services: normalizeServices(data.services),
     content: siteContent(data.content),
     promo: data.promo || defaultStore.promo,
     orders,
@@ -58,5 +72,7 @@ export async function readStore(
     role: user?.role || "customer",
     profile,
     hasMore,
+    paymentEnabled: midtransCheckoutEnabled(),
+    bank: bankDetails(settings.get("manualPayment"), branch),
   };
 }

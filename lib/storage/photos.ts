@@ -32,7 +32,7 @@ async function privateBucket() {
 
 function objectPath(path: string) {
   if (
-    !/^(?:orders\/[^/]+\/DF-[A-F0-9]{12}|profiles\/[^/]+\/avatar|banners\/(?:bogor\/)?(?:promo|people|member|wash|complete|iron)\/image)\.jpg$/.test(
+    !/^(?:orders\/[^/]+\/DF-[A-F0-9]{12}|profiles\/[^/]+\/avatar|banners\/(?:bogor\/)?(?:promo|people|member|wash|complete|iron)\/image|payments\/proofs\/DF-[A-F0-9]{12}\/[0-9a-f-]{36}|payments\/bank-qr\/(?:cinere|bogor)\/[0-9a-f-]{36})\.jpg$/.test(
       path,
     )
   )

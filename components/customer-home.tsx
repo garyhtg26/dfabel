@@ -50,15 +50,14 @@ export default function CustomerHome({
   const [category, setCategory] = useState("all");
   const [code, setCode] = useState("");
   const wash = store.services.find((s) => s.id === "wash")!;
-  const services = [...store.services]
+  const services = store.services
+    .filter((service) => service.category === "daily")
     .sort(
       (a, b) =>
-        ["wash", "complete", "iron", "member"].indexOf(a.id) -
-        ["wash", "complete", "iron", "member"].indexOf(b.id),
+        ["wash", "complete", "iron"].indexOf(a.id) -
+        ["wash", "complete", "iron"].indexOf(b.id),
     )
-    .filter(
-      (s) => s.id !== "member" && (category === "all" || s.id === category),
-    );
+    .filter((service) => category === "all" || service.id === category);
   const member = store.services.find((s) => s.id === "member")!;
 
   return (
@@ -96,7 +95,7 @@ export default function CustomerHome({
               <h2>{store.promo.title}</h2>
               <p className="campaign-price">
                 <span>{store.promo.description}</span>
-                <strong>{money(wash.price * 10)}</strong>
+                <strong>{money(wash.price)}</strong>
               </p>
               <button onClick={() => onOrder("wash")}>
                 {store.promo.button || "Jemput sekarang"} <Plus size={17} />
@@ -184,9 +183,11 @@ export default function CustomerHome({
                 <h3>{s.name}</h3>
                 <div>
                   <strong>
-                    {money(s.id === "wash" ? s.price * 10 : s.price)}
+                    {money(s.price)}
                   </strong>
-                  <small> / {s.id === "wash" ? "10 kg" : "kg"}</small>
+                  <small>
+                    / {s.packageSize ? `${s.packageSize} kg` : s.unit}
+                  </small>
                 </div>
                 <p>
                   <Clock size={14} />
@@ -235,7 +236,7 @@ export default function CustomerHome({
           )}
         </div>
         <p className="compact-terms">
-          Cuci-kering minimum 10 kg. Setrika tambahan per kg. Ongkir
+          Kiloan minimal 3 kg, cuci kering lipat minimal 10 kg. Ongkir
           dikonfirmasi toko.
         </p>
       </section>

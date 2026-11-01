@@ -640,18 +640,62 @@ footer > span {
 }
 .loading {
   display: flex;
-  min-height: 80vh;
+  min-height: 100svh;
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
+  padding: 28px 20px;
+  text-align: center;
 }
-.spin {
-  animation: spin 1s linear infinite;
+.loading > p {
+  max-width: 340px;
+  margin: 0;
+  color: var(--muted);
 }
-@keyframes spin {
+.loading-progress {
+  width: min(280px, 76vw);
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8eaff;
+}
+
+.payment-panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.payment-order-message {
+  order: 1;
+}
+.payment-order-bank {
+  order: 2;
+}
+.payment-order-actions {
+  order: 3;
+}
+.payment-order-receipt {
+  order: 4;
+}
+.payment-order-qr {
+  order: 5;
+}
+.loading-progress > span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #514cff, var(--blue));
+  animation: loading-progress 1.35s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform;
+}
+@keyframes loading-progress {
+  from {
+    transform: translateX(-105%);
+  }
   to {
-    transform: rotate(360deg);
+    transform: translateX(245%);
   }
 }
 .tracking-page {
@@ -1150,6 +1194,53 @@ td small {
 }
 .pos-services .service-card {
   padding: 18px;
+}
+.pos-selected-service {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 22px;
+  padding: 13px 15px;
+  border: 1px solid #dfe3f3;
+  border-radius: 12px;
+  background: #f8f9ff;
+}
+.pos-selected-service-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--blue);
+  background: #eeefff;
+}
+.pos-selected-service > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.pos-selected-service > span:nth-child(2) small {
+  color: #85899c;
+  font-size: 10px;
+}
+.pos-selected-service > span:nth-child(2) b {
+  overflow: hidden;
+  color: #252a3e;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pos-selected-service > strong {
+  margin-left: auto;
+  color: #252a3e;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.pos-selected-service > strong small {
+  color: #8b90a2;
+  font-size: 10px;
+  font-weight: 450;
 }
 .settings-panel {
   max-width: 760px;
@@ -3833,4 +3924,408 @@ input[type="checkbox"] {
 .customer-branch-select select {
   margin: 0;
   font-size: 13px;
+}
+
+.payment-review-alert {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 18px 20px;
+  text-align: left;
+  color: #78350f;
+  background: linear-gradient(110deg, #fff7df, #fffaf1);
+  border: 1px solid #f6cc77;
+  border-left: 5px solid #e89b19;
+  border-radius: 16px;
+  box-shadow: 0 3px 12px #d9951110;
+  transition:
+    box-shadow 160ms,
+    border-color 160ms;
+}
+.payment-review-alert:hover {
+  border-color: #d9982a;
+  box-shadow: 0 6px 20px #d9951120;
+}
+.payment-review-alert:focus-visible {
+  outline: 3px solid #b97818;
+  outline-offset: 3px;
+}
+.payment-review-alert-icon {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #f3d299;
+  background: #fff;
+  border-radius: 14px;
+}
+.payment-review-alert-copy {
+  display: grid;
+  flex: 1;
+  gap: 5px;
+}
+.payment-review-alert-copy strong {
+  font-size: 15px;
+}
+.payment-review-alert-copy > span {
+  color: #996824;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.payment-review-alert-action {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+.orders-panel .payment-review-row td {
+  background: #fffbeb;
+  border-bottom-color: #f8e3b5;
+}
+.orders-panel .payment-review-row td:first-child {
+  box-shadow: inset 3px 0 #eda928;
+}
+.orders-panel .table-tools {
+  flex-wrap: wrap;
+}
+.orders-panel .table-tools .tabs {
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  .payment-review-alert {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 16px;
+  }
+  .payment-review-alert-copy {
+    flex-basis: calc(100% - 70px);
+  }
+  .payment-review-alert-action {
+    padding-left: 60px;
+  }
+}
+
+/* Shared service catalog: the same price list is used by customers, POS, and settings. */
+.service-catalog {
+  display: grid;
+  gap: 22px;
+}
+.daily-rate-section,
+.service-catalog-group,
+.price-editor-group {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e5e8f1;
+  border-radius: 17px;
+  background: #fff;
+  box-shadow: 0 5px 18px #172a5708;
+}
+.service-catalog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px;
+  border-bottom: 1px solid #edf0f6;
+}
+.service-catalog-heading h3 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+.service-catalog-heading p,
+.service-catalog-heading > span {
+  margin: 5px 0 0;
+  color: #7c8292;
+  font-size: 12px;
+}
+.daily-rate-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.daily-rate-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  text-align: center;
+}
+.daily-rate-table th,
+.daily-rate-table td {
+  padding: 15px 13px;
+  border-right: 1px solid #edf0f6;
+  border-bottom: 1px solid #edf0f6;
+}
+.daily-rate-table tr:last-child > * {
+  border-bottom: 0;
+}
+.daily-rate-table tr > *:last-child {
+  border-right: 0;
+}
+.daily-rate-table thead th {
+  color: #4c5570;
+  background: #f6f8fc;
+  font-size: 12px;
+  font-weight: 700;
+}
+.daily-rate-table thead th:first-child {
+  width: 28%;
+  text-align: left;
+}
+.daily-rate-table thead small,
+.daily-rate-table tbody small {
+  display: block;
+  margin-top: 4px;
+  color: #8d93a2;
+  font-size: 11px;
+  font-weight: 450;
+}
+.daily-rate-table tbody th {
+  text-align: left;
+}
+.daily-rate-table tbody th > span {
+  display: block;
+  color: #20263a;
+  font-size: 13px;
+}
+.daily-rate-table tbody th > button {
+  margin-top: 8px;
+  color: #302bd7;
+  font-size: 11px;
+  font-weight: 700;
+}
+.daily-rate-table tbody td {
+  color: #182958;
+  font-size: 13px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.service-item-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.service-item-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  padding: 16px 19px;
+  border-bottom: 1px solid #edf0f6;
+  color: #252a3e;
+  text-align: left;
+  transition: background 160ms ease;
+}
+.service-item-card:nth-child(odd) {
+  border-right: 1px solid #edf0f6;
+}
+.service-item-card:hover {
+  background: #f8f9ff;
+}
+.service-item-card .service-icon {
+  width: 38px;
+  height: 38px;
+}
+.service-item-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+.service-item-copy b {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+}
+.service-item-copy small {
+  overflow: hidden;
+  color: #858b9b;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.service-item-card > strong {
+  color: #202554;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.service-item-card > strong small {
+  color: #8d93a2;
+  font-size: 10px;
+  font-weight: 500;
+}
+.service-item-card > svg:last-child {
+  color: #5650df;
+}
+.price-editor-catalog {
+  display: grid;
+  gap: 18px;
+  margin-top: 20px;
+}
+.price-editor-group {
+  overflow-x: auto;
+  padding: 15px 17px;
+  box-shadow: none;
+}
+.price-editor-group h4 {
+  margin: 0 0 13px;
+  color: #232844;
+  font-size: 14px;
+}
+.price-editor-row,
+.price-editor-speed-head {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.55fr) repeat(4, minmax(82px, 1fr));
+  align-items: center;
+  gap: 9px;
+  min-width: 620px;
+  padding: 10px 0;
+  border-top: 1px solid #edf0f6;
+}
+.price-editor-speed-head {
+  padding: 8px 0;
+  color: #858b9b;
+  font-size: 10px;
+}
+.price-editor-speed-head > span:not(:first-child) {
+  text-align: center;
+}
+.price-editor-name {
+  display: grid;
+  gap: 4px;
+}
+.price-editor-name b {
+  color: #30354a;
+  font-size: 12px;
+}
+.price-editor-name small {
+  color: #8b91a0;
+  font-size: 10px;
+}
+.price-editor-input {
+  display: block !important;
+  margin: 0 !important;
+}
+.price-editor-input input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 8px;
+  border: 1px solid #e1e5ef;
+  border-radius: 8px;
+  font-size: 12px;
+  text-align: right;
+}
+.price-editor-group:not([data-matrix="true"]) .price-editor-single {
+  grid-column: 2 / -1;
+  justify-self: end;
+  width: min(190px, 100%);
+}
+.pos-category-tabs {
+  display: flex;
+  gap: 7px;
+  margin: 19px 0 14px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-width: thin;
+}
+.pos-category-tabs button {
+  flex: 0 0 auto;
+  padding: 9px 12px;
+  border: 1px solid #e2e5ef;
+  border-radius: 999px;
+  color: #72788a;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+.pos-category-tabs button.selected {
+  border-color: #d4d2ff;
+  color: #2e2acb;
+  background: #f1f0ff;
+}
+.pos-service-minimum {
+  display: block;
+  margin-top: 6px;
+  color: #858b9b;
+  font-size: 10px;
+}
+.selected-service-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 12px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  color: #3734c4;
+  background: #f3f2ff;
+}
+.selected-service-note span {
+  display: grid;
+  gap: 2px;
+}
+.selected-service-note b {
+  color: #34384e;
+  font-size: 12px;
+}
+.selected-service-note small {
+  color: #7e8292;
+  font-size: 10px;
+}
+.order-other-services {
+  margin: 3px 0 16px;
+  border: 1px solid #e5e8f0;
+  border-radius: 11px;
+  background: #fbfcff;
+}
+.order-other-services summary {
+  padding: 12px 14px;
+  color: #555b70;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.order-other-services select {
+  width: calc(100% - 24px);
+  margin: 0 12px 12px;
+}
+.service-standard-time {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 15px;
+  color: #757b8e;
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .service-catalog-heading {
+    align-items: flex-start;
+    padding: 17px 15px;
+  }
+  .service-catalog-heading h3 {
+    font-size: 16px;
+  }
+  .service-item-grid {
+    grid-template-columns: 1fr;
+  }
+  .service-item-card:nth-child(odd) {
+    border-right: 0;
+  }
+  .service-item-card {
+    padding: 13px 14px;
+  }
+  .service-item-copy b {
+    font-size: 12px;
+  }
+  .service-item-copy small {
+    white-space: normal;
+  }
+  .price-editor-group {
+    margin-right: -4px;
+  }
+  .pos-category-tabs {
+    margin-right: -12px;
+    padding-right: 12px;
+  }
 }

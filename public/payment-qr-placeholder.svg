@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title description">
+  <title id="title">Contoh QR pembayaran</title>
+  <desc id="description">Ilustrasi saja. Bukan kode pembayaran dan tidak dapat digunakan untuk transfer.</desc>
+  <rect width="256" height="256" rx="24" fill="#f8faff"/>
+  <g fill="none" stroke="#b6c4e2" stroke-width="8">
+    <rect x="28" y="28" width="52" height="52" rx="5"/>
+    <rect x="176" y="28" width="52" height="52" rx="5"/>
+    <rect x="28" y="176" width="52" height="52" rx="5"/>
+  </g>
+  <g fill="#b6c4e2">
+    <rect x="44" y="44" width="20" height="20" rx="2"/>
+    <rect x="192" y="44" width="20" height="20" rx="2"/>
+    <rect x="44" y="192" width="20" height="20" rx="2"/>
+    <path d="M100 28h12v12h-12zM124 28h24v12h-24zM100 52h24v12h-24zM136 52h12v24h-12zM100 76h12v12h-12zM28 100h24v12H28zM64 100h24v12H64zM28 124h12v24H28zM52 136h24v12H52zM176 100h12v24h-12zM200 100h28v12h-28zM216 124h12v24h-12zM100 176h12v24h-12zM124 176h24v12h-24zM136 200h12v28h-12zM100 216h12v12h-12zM176 176h24v12h-24zM212 176h16v24h-16zM176 200h12v28h-12zM200 216h28v12h-28z"/>
+  </g>
+  <rect x="20" y="106" width="216" height="46" rx="12" fill="#ffffff" stroke="#dce4f3"/>
+  <text x="128" y="134" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="1.2" fill="#667b9f">QR CONTOH</text>
+</svg>

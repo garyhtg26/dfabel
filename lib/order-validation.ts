@@ -7,7 +7,8 @@ export const orderSchema = z.object({
     .string()
     .transform(normalizePhone)
     .pipe(z.string().regex(/^\+628\d{7,12}$/, "Nomor WhatsApp tidak valid")),
-  service: z.enum(["complete", "wash", "iron"]),
+  service: z.string().min(2).max(50),
+  speed: z.enum(["regular", "oneDay", "express", "quick"]).default("regular"),
   kg: z.number().min(1).max(100),
   express: z.boolean(),
   address: z.string().trim().min(8).max(500),
@@ -32,24 +33,30 @@ export const updateSchema = z.object({
   paid: z.boolean(),
   shippingFee: z.number().int().min(0).max(10000000).nullable(),
 });
+const validPrice = z.number().int().min(1000).max(10000000);
+const ratesSchema = z
+  .object({
+    regular: validPrice,
+    oneDay: validPrice,
+    express: validPrice,
+    quick: validPrice,
+  })
+  .strict();
 export const pricesSchema = z
   .array(
-    z.object({
-      id: z.enum(["complete", "wash", "iron", "member"]),
-      price: z.number().int().min(1000).max(10000000),
-    }),
+    z
+      .object({
+        id: z.string().regex(/^[a-z0-9-]{2,50}$/),
+        price: validPrice,
+        rates: ratesSchema.optional(),
+      })
+      .strict(),
   )
-  .length(4)
-  .refine(
-    (p) => new Set(p.map((v) => v.id)).size === 4,
-    "Layanan harus lengkap dan unik",
-  )
-  .refine(
-    (p) =>
-      p.find((v) => v.id === "complete")!.price >=
-      p.find((v) => v.id === "wash")!.price,
-    "Harga lengkap minimal sama dengan cuci-kering",
-  );
+  .min(3)
+  .max(50)
+  .refine((p) => new Set(p.map((v) => v.id)).size === p.length, {
+    message: "Layanan harus lengkap dan unik",
+  });
 export const promoSchema = z.object({
   title: z.string().trim().min(3).max(90),
   description: z.string().max(220),

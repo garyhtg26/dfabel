@@ -11,7 +11,7 @@ export type BranchLocation = {
 
 export const branches: Record<BranchId, string> = {
   cinere: "Cinere",
-  bogor: "Bogor",
+  bogor: "Cibubur",
 };
 
 export const branchLocations: Record<BranchId, BranchLocation> = {
@@ -22,10 +22,10 @@ export const branchLocations: Record<BranchId, BranchLocation> = {
     longitude: 106.7844,
   },
   bogor: {
-    name: "D’Fable Bogor",
-    area: "Bogor",
-    latitude: -6.5971,
-    longitude: 106.806,
+    name: "D’Fable Cibubur",
+    area: "Cibubur, Jakarta Timur",
+    latitude: -6.35694,
+    longitude: 106.88194,
   },
 };
 

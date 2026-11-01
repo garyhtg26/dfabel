@@ -18,8 +18,6 @@ import {
   reload,
   signInWithPopup,
   signOut,
-  setPersistence,
-  browserSessionPersistence,
   type User,
 } from "firebase/auth";
 import { clientAuth, clientReady } from "@/lib/firebase/client";
@@ -100,17 +98,11 @@ export function AuthProvider({
       return;
     }
     let disposed = false;
-    let unsubscribe = () => {};
-    void setPersistence(clientAuth(scope), browserSessionPersistence)
-      .then(() => {
-        if (disposed) return;
-        unsubscribe = onIdTokenChanged(clientAuth(scope), () => {
-          void sync().catch(() => setSession({ ...initial, loading: false }));
-        });
-      })
-      .catch(() => {
+    const unsubscribe = onIdTokenChanged(clientAuth(scope), () => {
+      void sync().catch(() => {
         if (!disposed) setSession({ ...initial, loading: false });
       });
+    });
     return () => {
       disposed = true;
       unsubscribe();
@@ -163,19 +155,16 @@ export function AuthProvider({
         login: async () => {
           if (scope !== "customer") throw Error("Dashboard requires password");
           const provider = new GoogleAuthProvider();
-          await setPersistence(clientAuth(scope), browserSessionPersistence);
           provider.setCustomParameters({ prompt: "select_account" });
           await signInWithPopup(clientAuth(scope), provider);
           await sync();
         },
         loginEmail: async (email, password) => {
-          await setPersistence(clientAuth(scope), browserSessionPersistence);
           await signInWithEmailAndPassword(clientAuth(scope), email, password);
           await sync();
         },
         register: async (name, email, password) => {
           if (scope !== "customer") throw Error("Customer signup only");
-          await setPersistence(clientAuth(scope), browserSessionPersistence);
           const result = await createUserWithEmailAndPassword(
             clientAuth(scope),
             email,

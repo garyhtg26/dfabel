@@ -1,3 +1,10 @@
+export type ServiceSpeed = "regular" | "oneDay" | "express" | "quick";
+export type ServiceCategory =
+  | "daily"
+  | "household"
+  | "premium"
+  | "additional"
+  | "member";
 export type Service = {
   id: string;
   name: string;
@@ -6,6 +13,10 @@ export type Service = {
   unit: string;
   days: string;
   icon: string;
+  category: ServiceCategory;
+  rates?: Partial<Record<ServiceSpeed, number>>;
+  minimumQuantity?: number;
+  packageSize?: number;
 };
 export type Order = {
   id: string;
@@ -15,6 +26,10 @@ export type Order = {
   name: string;
   phone: string;
   service: string;
+  unit?: string;
+  speed?: ServiceSpeed;
+  pricingVersion?: 2;
+  minimumQuantity?: number;
   kg: number;
   actualKg: number | null;
   express: boolean;
@@ -28,6 +43,10 @@ export type Order = {
   photoPath?: string;
   status: number;
   paid: boolean;
+  payment?: import("./payments/types").PaymentSummary;
+  paymentReconciliationRequired?: boolean;
+  manualPayment?: import("./payments/manual-types").ManualPaymentSummary;
+  paymentRevision?: number;
   shippingFee: number | null;
   total: number;
   unitPrice: number;
@@ -55,16 +74,26 @@ export type Store = {
   role?: "owner" | "admin" | "staff" | "customer";
   profile?: CustomerProfile;
   hasMore?: boolean;
+  paymentEnabled?: boolean;
+  bank?: import("./payments/manual-types").BankDetails;
 };
 export type TrackingOrder = Pick<
   Order,
   | "id"
   | "service"
+  | "unit"
+  | "speed"
+  | "pricingVersion"
+  | "minimumQuantity"
   | "kg"
   | "actualKg"
   | "express"
   | "status"
   | "paid"
+  | "payment"
+  | "paymentReconciliationRequired"
+  | "manualPayment"
+  | "branchId"
   | "total"
   | "shippingFee"
   | "date"

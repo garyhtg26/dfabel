@@ -13,8 +13,12 @@ import {
   Shirt,
 } from "lucide-react";
 import { money, statuses, type TrackingOrder, type Service } from "@/lib/types";
+import { branches, isBranchId } from "@/lib/branches";
+import { speedLabel, unitLabel } from "@/lib/catalog";
+import PaymentPanel from "./payment-panel";
 export const previewTracking: TrackingOrder = {
   id: "DF-CONTOH",
+  branchId: "cinere",
   service: "complete",
   kg: 5,
   actualKg: 5,
@@ -38,10 +42,16 @@ export default function Tracking({
   order: o,
   services,
   preview = false,
+  trackingToken,
+  paymentEnabled,
+  onOrderChanged,
 }: {
   order: TrackingOrder;
   services: Service[];
   preview?: boolean;
+  trackingToken?: string;
+  paymentEnabled?: boolean;
+  onOrderChanged?: () => void;
 }) {
   const stage = o.status < 3 ? 0 : o.status < 6 ? 1 : o.status === 6 ? 2 : 3;
   const phases = [
@@ -164,16 +174,24 @@ export default function Tracking({
           </div>
           <div className="flex gap-2 text-xs text-slate-500">
             <span className="rounded-lg bg-slate-50 px-3 py-2">
-              {o.actualKg ?? o.kg} kg{o.actualKg === null ? " estimasi" : ""}
+              {o.actualKg ?? o.kg}{" "}
+              {unitLabel(
+                o.unit ?? services.find((s) => s.id === o.service)?.unit,
+              )}
+              {o.actualKg === null ? " estimasi" : ""}
             </span>
             <span className="rounded-lg bg-slate-50 px-3 py-2">
-              {o.express ? "Express" : "Regular"}
+              {speedLabel(o.speed, o.express)}
             </span>
           </div>
           <div className="my-5 space-y-3 border-y border-slate-100 py-5 text-sm">
             <div className="flex justify-between gap-3">
               <span className="text-slate-400">Cabang</span>
-              <b className="font-medium">Cinere</b>
+              <b className="font-medium">
+                {"branchId" in o && isBranchId(o.branchId)
+                  ? branches[o.branchId]
+                  : "Cinere"}
+              </b>
             </div>
             <div className="flex justify-between gap-3">
               <span className="text-slate-400">Jadwal masuk / jemput</span>
@@ -203,16 +221,23 @@ export default function Tracking({
               {money(o.total)}
             </strong>
           </div>
-          <div
-            className={`flex items-center gap-2 rounded-xl p-3 text-sm ${o.paid ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"}`}
-          >
-            <ShieldCheck size={18} />
-            {o.paid ? "Pembayaran dikonfirmasi" : "Menunggu pembayaran"}
-          </div>
-          {!o.paid && (
-            <p className="!mb-0 !mt-3 text-xs leading-relaxed text-slate-400">
-              Toko akan mengonfirmasi tagihan final dan instruksi transfer.
-            </p>
+          {preview ? (
+            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
+              <ShieldCheck size={18} /> Pembayaran dikonfirmasi
+            </div>
+          ) : (
+            <PaymentPanel
+              key={o.id}
+              orderId={o.id}
+              trackingToken={trackingToken}
+              enabled={paymentEnabled}
+              initialPaid={o.paid}
+              initialPayment={o.payment}
+              initialManualPayment={o.manualPayment}
+              initialReviewRequired={o.paymentReconciliationRequired}
+              hideQrByDefault
+              onChanged={onOrderChanged}
+            />
           )}
         </section>
       </div>

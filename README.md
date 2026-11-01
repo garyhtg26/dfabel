@@ -47,7 +47,8 @@ Vercel deployment is separate from configuring the Firebase and Supabase project
 ## Data and permissions
 
 - `access/{uid}`: server-managed role and disabled flag, checked on every authenticated request. Role changes revoke sessions. Account deletion preserves transaction records.
-- `orders`: UID-bound web orders, separate unclaimed walk-in orders, branch ID `cinere`, immutable original tariff, actual weight, confirmed transport fee, status history and manual payment status.
+- `orders`: UID-bound web orders, separate unclaimed walk-in orders, branch ID, immutable original tariff, actual weight, confirmed transport fee, status history, and payment summary.
+- `paymentAttempts`: server-only Midtrans QRIS attempts with fixed amount, provider reference, environment, expiry, and verified status. `paymentSignals/{branch}` carries a branch refresh signal without customer data.
 - `users/{uid}`: Google email/name and required normalized WhatsApp number saved transactionally with each web order. Customer browser storage is not used for profiles.
 - `walkInCustomers`: name and phone stored by hashed phone identifier. No existing customer account is linked merely by an unverified phone match. Share its private tracking link with the walk-in customer.
 - `settings/cinere`: editable prices and promo. Defaults are used until the first admin change.
@@ -55,7 +56,7 @@ Vercel deployment is separate from configuring the Firebase and Supabase project
 - `rateLimits/{uid}`: transactional rolling hour order limit (10 customer / 120 admin).
 - Supabase Storage path `orders/{uid}/{orderId}.jpg`: private photo, served through an owner/admin-authorized endpoint with no-store caching.
 
-Order creation is idempotent for the same request ID. Customer-provided `source: pos` cannot bypass admin authorization. All admin mutations are verified server-side. Status cannot move backwards; final payment needs confirmed weight and ongkir. A paid invoice cannot change totals unless its paid state is first cleared. Transport may be zero, but unknown transport fees are not silently called free.
+Order creation is idempotent for the same request ID. Customer-provided `source: pos` cannot bypass admin authorization. All admin mutations are verified server-side. Status cannot move backwards; final payment needs confirmed weight and ongkir. Active QRIS invoices, submitted transfer receipts, and paid invoices cannot change totals. Payment confirmation uses the dedicated payment workflow rather than changing `paid` in the order form. Transport may be zero, but unknown transport fees are not silently called free.
 
 Order listing is capped at the latest 500 records per authorized query. The dashboard labels the limit when reached; add pagination and server aggregate reporting before volume grows beyond this range. Firebase project rules/indexes must actually be deployed; committing them alone does not configure Firebase.
 
@@ -63,7 +64,27 @@ Order listing is capped at the latest 500 records per authorized query. The dash
 
 Cinere cuci-kering: Rp20,000 up to 10 kg, then Rp2,000/kg. Ironing adds Rp4,000 per actual kg. 5 kg wash + iron = Rp40,000, 10 kg = Rp60,000. Iron-only = Rp4,000/kg. Express adds 50%. Transport has no radius cap in this version and is confirmed by the shop. Existing orders retain their captured tariff after price edits.
 
-Membership is still an explicitly labelled draft package, with no automatic activation or quota ledger. Payment is manually checked by staff; no payment gateway, automatic transfer reconciliation or bank account data is configured. No automated WhatsApp messages are sent. Public tracking visualizes store-entered progress, not courier GPS. Final business rates, account details and operating policies still need owner confirmation before real orders.
+Membership has no automatic activation or quota ledger. Customers and POS choose a bank transfer after ordering, upload private proof, and submit it for shop confirmation. QRIS is marked coming soon until the merchant is approved and its checkout feature flag is explicitly enabled. Payment submission requires the shop to confirm actual weight and shipping. No automated WhatsApp messages are sent. Public tracking visualizes store-entered progress, not courier GPS. Final business rates, bank-account details, merchant activation, and operating policies still need owner confirmation before real orders.
+
+## Manual bank transfers
+
+See [the manual payment guide](docs/manual-payments.md). Owner/admin accounts configure the bank, account number, account holder, and optional QR in **Dashboard → Pembayaran** for each branch. Staff cannot edit payment destinations. BCA is the initial bank name, with no invented account number. An explicitly labelled, non-payable QR illustration is shown until a real business QR is uploaded.
+
+The customer order confirmation, tracking page, POS confirmation, and shop detail use the same payment panel. Uploading proof only saves a draft. The customer must submit it; the amber **Perlu konfirmasi** state stays separate from green **Lunas**. Shop operators verify bank mutations and approve the exact submitted proof, or reject it with a reason. Rejection requires a new proof upload before resubmission. The order form cannot bypass review with a paid checkbox.
+
+Bank destinations and QR versions are snapshotted when selected. Uploaded proof is private and served through an order-authorized endpoint. Review locks the invoice amount; successful confirmation updates the shop's paid revenue. The overview has an attention banner, a review filter, and highlighted pending rows. A server event updates customer and shop states even while Midtrans is disabled.
+
+## Midtrans QRIS
+
+See [the QRIS setup and testing guide](docs/midtrans-qris.md). Add server-only `MIDTRANS_SERVER_KEY`, `MIDTRANS_IS_PRODUCTION=false` for sandbox, and optional `MIDTRANS_MERCHANT_ID` to `.env.local` and the matching Vercel environment. Leave `MIDTRANS_QRIS_ENABLED=false` while approval is pending; enable it only when ready to test/accept QRIS. No browser Client Key or extra npm dependency is required.
+
+Set the public HTTPS Payment Notification URL in Midtrans to `https://YOUR_DOMAIN/api/payments/webhook`. Use a staging deployment without Vercel Authentication or deployment password protection for sandbox notifications. `localhost` cannot receive Midtrans webhooks.
+
+The customer tracking page, shop order detail, and POS confirmation display the QR and its expiry, allow downloading it, and update payment status automatically. Bounded server-sent event connections watch Firestore through the server and reconnect on Vercel; status reconciliation provides a backup. Existing direct browser Firestore access stays denied, so this integration needs no new browser permissions or Firestore index. Server Key is never sent to the browser.
+
+Notifications require signature verification and a server-to-server lookup that matches the exact amount, provider reference, transaction, and environment. Replays cannot unset a successful payment. Ambiguous creation timeouts keep the original reference and invoice lock; retries recover the same attempt. A verified late payment on a superseded invoice is recorded and flagged for review instead of overwriting the current bill. Submitted manual transfers and active QRIS attempts cannot overlap on the same invoice. Sandbox payments are labelled and excluded from the paid-sales amount.
+
+Use separate staging data for sandbox. Live merchant approval, payment-channel activation, webhook delivery, and a production payment must be verified with Midtrans before launch. Automated tests do not perform real payment or merchant verification. Refund requests follow Midtrans's channel capabilities and merchant approval; exceptions require shop review rather than a second payment.
 
 ## Google Maps
 
@@ -117,6 +138,6 @@ User management lists Firebase Auth accounts, including users without orders. Wh
 
 ### Workspace cabang
 
-Dashboard menyediakan Cinere dan Bogor. Cabang aktif tersimpan di parameter URL `branch`, sehingga refresh tetap membuka workspace yang sama. Pesanan POS, harga, promo, dan gambar tersimpan per cabang. Web pelanggan dapat dibuka lewat `/?branch=bogor`; tanpa parameter memakai Cinere. Akun pengguna dan role tetap berlaku untuk kedua cabang. Pengaturan Bogor menggunakan nilai awal sampai disimpan sendiri, tanpa menyalin pesanan Cinere.
+Dashboard menyediakan Cinere dan Cibubur. Cabang aktif tersimpan di parameter URL `branch`, sehingga refresh tetap membuka workspace yang sama. Pesanan POS, harga, promo, dan gambar tersimpan per cabang. Web pelanggan dapat dibuka lewat `/?branch=bogor` (ID internal cabang Cibubur); tanpa parameter memakai Cinere. Akun pengguna dan role tetap berlaku untuk kedua cabang. Layanan, promo, dan gambar Cibubur tetap memakai nilai awal sampai diatur sendiri; pengaturan cabang tidak menyalin pesanan Cinere.
 
 Daftar pesanan admin memakai indeks single-field `branchId`, lalu mengurutkan hasil sebelum membatasi tampilan ke 500 pesanan. Untuk volume besar, ganti dengan pagination dan indeks gabungan `branchId`/`createdAt` agar pembacaan tidak meningkat bersama jumlah seluruh pesanan cabang.

@@ -17,9 +17,23 @@ import {
 } from "@/lib/branches";
 import ContentEditor from "./content-editor";
 import Tracking, { previewTracking } from "./tracking";
+import PaymentPanel from "./payment-panel";
+import PaymentSettings from "./payment-settings";
+import PaymentStatus from "./payment-status";
+import { consumePaymentEvents } from "@/lib/payment-stream";
+import { requestBranchStore } from "@/lib/branch-loading";
 import AuthorizedPhoto from "./authorized-photo";
 import type { TrackingOrder } from "@/lib/types";
-import { calculatePrice } from "@/lib/pricing";
+import {
+  serviceCategoryLabels,
+  serviceCategoryOrder,
+  serviceRate,
+  serviceSpeeds,
+  serviceTotal,
+  serviceUnitRate,
+  speedLabel,
+  unitLabel,
+} from "@/lib/catalog";
 import {
   Shirt,
   WashingMachine,
@@ -47,7 +61,6 @@ import {
   CheckCircle2,
   Copy,
   Info,
-  Loader2,
   Minus,
   SlidersHorizontal,
   Headphones,
@@ -61,6 +74,8 @@ import {
   type Store,
   type Order,
   type Service,
+  type ServiceCategory,
+  type ServiceSpeed,
 } from "@/lib/types";
 const MapPicker = dynamic(() => import("./map-picker"), {
   ssr: false,
@@ -71,6 +86,9 @@ const icons = {
   wash: WashingMachine,
   iron: Wind,
   member: Layers,
+  household: Package,
+  premium: Shirt,
+  additional: Wind,
 };
 const CUSTOMER_BRANCH_KEY = "dfable-customer-branch";
 const today = () =>
@@ -80,13 +98,11 @@ const today = () =>
 function estimate(
   services: Service[],
   id: string,
-  kg: number,
-  express: boolean,
+  quantity: number,
+  speed: ServiceSpeed,
 ) {
-  const s = services.find((v) => v.id === id);
-  if (!s) return 0;
-  const wash = services.find((v) => v.id === "wash")!.price;
-  return calculatePrice(id, kg, s.price, wash, express);
+  const service = services.find((value) => value.id === id);
+  return service ? serviceTotal(service, quantity, speed) : 0;
 }
 function Brand() {
   return (
@@ -169,12 +185,15 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   const [loadedSession, setLoadedSession] = useState("");
   const [view, setView] = useState("home");
   const [adminView, setAdminView] = useState("overview");
+  const [posCategory, setPosCategory] = useState<ServiceCategory>("daily");
   const [modal, setModal] = useState("");
   const [service, setService] = useState("complete");
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(false);
   const [profile, setProfile] = useState({ name: "", phone: "" });
   const [track, setTrack] = useState("");
+  const activeTrack = useRef(track);
+  activeTrack.current = track;
   const [selected, setSelected] = useState<Order | null>(null);
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
@@ -183,16 +202,22 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   const activeSession = useRef(sessionKey);
   activeSession.current = sessionKey;
   const loadSequence = useRef(0);
+  const storeLoadController = useRef<AbortController | null>(null);
   async function load() {
+    storeLoadController.current?.abort();
+    const controller = new AbortController();
+    storeLoadController.current = controller;
     const capturedSession = sessionKey;
     const sequence = ++loadSequence.current;
+    setError("");
     try {
-      const r = await auth.request(`/api/store?branch=${branch}`, {
-        cache: "no-store",
-      });
-      if (!r.ok) throw Error("Data belum bisa dimuat");
-      const data = await r.json();
+      const data = await requestBranchStore(
+        auth.request,
+        branch,
+        controller.signal,
+      );
       if (
+        controller.signal.aborted ||
         capturedSession !== activeSession.current ||
         sequence !== loadSequence.current
       )
@@ -206,12 +231,71 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
       setError("");
     } catch (e) {
       if (
+        !controller.signal.aborted &&
         capturedSession === activeSession.current &&
         sequence === loadSequence.current
       )
         setError((e as Error).message);
+    } finally {
+      if (storeLoadController.current === controller)
+        storeLoadController.current = null;
     }
   }
+  const latestLoad = useRef(load);
+  latestLoad.current = load;
+  useEffect(() => {
+    if (!dashboard || !store?.isAdmin || !auth.user || !auth.verified) return;
+    let disposed = false;
+    let controller: AbortController | null = null;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let connecting = false;
+    const connect = async () => {
+      if (disposed || connecting || document.visibilityState !== "visible")
+        return;
+      connecting = true;
+      const current = new AbortController();
+      controller = current;
+      try {
+        const response = await auth.request(
+          `/api/payments/events?branch=${branch}`,
+          { signal: current.signal, cache: "no-store" },
+        );
+        if (!response.ok) throw Error("Payment updates unavailable");
+        await consumePaymentEvents(response, (event) => {
+          if (!disposed && !current.signal.aborted && event === "refresh")
+            void latestLoad.current();
+        });
+      } catch {
+        // The existing store refresh remains available during reconnection.
+      } finally {
+        connecting = false;
+        if (!disposed && document.visibilityState === "visible")
+          retry = setTimeout(connect, 3000);
+      }
+    };
+    const visibility = () => {
+      clearTimeout(retry);
+      if (document.visibilityState === "visible") {
+        void latestLoad.current();
+        void connect();
+      } else controller?.abort();
+    };
+    void connect();
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      disposed = true;
+      clearTimeout(retry);
+      controller?.abort();
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [
+    dashboard,
+    store?.isAdmin,
+    auth.user?.uid,
+    auth.verified,
+    branch,
+    auth.request,
+  ]);
   useEffect(() => {
     setLoadedSession("");
     setError("");
@@ -237,7 +321,10 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
       setView("tracking");
     }
     const interval = setInterval(load, 15000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      storeLoadController.current?.abort();
+    };
   }, [auth.user?.uid, auth.verified, auth.provider, branch]);
   useEffect(() => {
     setPublicOrder(null);
@@ -317,7 +404,13 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   const myOrders = orders.filter((o) => auth.user && o.uid === auth.user.uid);
   const visible = orders.filter(
     (o) =>
-      (filter === "all" || (filter === "active" ? o.status < 7 : !o.paid)) &&
+      (filter === "all" ||
+        (filter === "active"
+          ? o.status < 7
+          : filter === "review"
+            ? o.manualPayment?.status === "awaiting_review" ||
+              o.paymentReconciliationRequired
+            : !o.paid)) &&
       `${o.id} ${o.name} ${o.phone}`
         .toLowerCase()
         .includes(query.toLowerCase()),
@@ -331,13 +424,21 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
     return (
       <main className="loading">
         <Brand />
-        <p>{error || "Menyiapkan studio…"}</p>
+        <p role="status" aria-live="polite">
+          {error || "Menyiapkan studio…"}
+        </p>
         {error ? (
           <button className="primary" onClick={load}>
             Coba lagi
           </button>
         ) : (
-          <Loader2 className="spin" />
+          <div
+            className="loading-progress"
+            role="progressbar"
+            aria-label="Memuat data"
+          >
+            <span />
+          </div>
         )}
       </main>
     );
@@ -354,7 +455,19 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
         <AccountPanel admin phone={profile.phone} onDone={() => load()} />
       </main>
     );
-  const revenue = orders.filter((o) => o.paid).reduce((a, o) => a + o.total, 0);
+  const revenue = orders
+    .filter(
+      (o) =>
+        o.paid &&
+        !o.paymentReconciliationRequired &&
+        o.payment?.environment !== "sandbox",
+    )
+    .reduce((a, o) => a + o.total, 0);
+  const pendingPayments = orders.filter(
+    (o) =>
+      o.manualPayment?.status === "awaiting_review" ||
+      o.paymentReconciliationRequired,
+  ).length;
   return (
     <>
       {dashboard ? (
@@ -377,7 +490,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                 }}
               >
                 <option value="cinere">Cabang Cinere</option>
-                <option value="bogor">Cabang Bogor</option>
+                <option value="bogor">Cabang Cibubur</option>
               </select>
             </label>
             <span className="nav-caption">OPERASIONAL</span>
@@ -387,12 +500,14 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
               ["pos", "Kasir / POS", ReceiptText],
               ["prices", "Layanan & harga", Tags],
               ["promo", "Banner & promosi", Megaphone],
+              ["payments", "Pembayaran", Wallet],
               ["users", "Pengguna & akses", ShieldCheck],
             ]
               .filter(
                 ([id]) =>
-                  !["users", "prices", "promo"].includes(id as string) ||
-                  store.canManageUsers,
+                  !["users", "prices", "promo", "payments"].includes(
+                    id as string,
+                  ) || store.canManageUsers,
               )
               .map(([id, label, C]) => {
                 const Component = C as typeof Shirt;
@@ -429,6 +544,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                         pos: "Kasir",
                         prices: "Layanan & harga",
                         promo: "Banner & promosi",
+                        payments: "Pembayaran",
                         users: "Pengguna & akses",
                       } as Record<string, string>
                     )[adminView]
@@ -450,7 +566,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   }}
                 >
                   <option value="cinere">Cinere</option>
-                  <option value="bogor">Bogor</option>
+                  <option value="bogor">Cibubur</option>
                 </select>
               </label>
               <DashboardAccount branchName={branchName} />
@@ -469,7 +585,9 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                             ? "Kasir / POS"
                             : adminView === "prices"
                               ? "Layanan & harga"
-                              : "Banner & promosi"}
+                              : adminView === "payments"
+                                ? "Pembayaran"
+                                : "Banner & promosi"}
                   </h1>
                 </div>
               </div>
@@ -478,6 +596,32 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
               )}
               {adminView === "overview" && (
                 <>
+                  {pendingPayments > 0 && (
+                    <button
+                      type="button"
+                      className="payment-review-alert"
+                      onClick={() => {
+                        setAdminView("orders");
+                        setFilter("review");
+                      }}
+                    >
+                      <span className="payment-review-alert-icon">
+                        <ReceiptText size={24} />
+                      </span>
+                      <span className="payment-review-alert-copy">
+                        <strong>
+                          {pendingPayments} pembayaran perlu konfirmasi
+                        </strong>
+                        <span>
+                          Periksa bukti transfer untuk mengonfirmasi pembayaran
+                          pelanggan.
+                        </span>
+                      </span>
+                      <span className="payment-review-alert-action">
+                        Periksa sekarang
+                      </span>
+                    </button>
+                  )}
                   <div className="metrics">
                     {[
                       [Wallet, "Penjualan terbayar", money(revenue)],
@@ -583,6 +727,10 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                         ["all", "Semua"],
                         ["active", "Aktif"],
                         ["unpaid", "Belum dibayar"],
+                        [
+                          "review",
+                          `Perlu konfirmasi${pendingPayments ? ` (${pendingPayments})` : ""}`,
+                        ],
                       ].map(([v, t]) => (
                         <button
                           key={v}
@@ -619,7 +767,14 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                         {visible
                           .slice(0, adminView === "overview" ? 5 : 1000)
                           .map((o) => (
-                            <tr key={o.id}>
+                            <tr
+                              key={o.id}
+                              className={
+                                o.manualPayment?.status === "awaiting_review"
+                                  ? "payment-review-row"
+                                  : undefined
+                              }
+                            >
                               <td>
                                 <b>{o.name}</b>
                                 <small>
@@ -633,8 +788,14 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                                     ?.name
                                 }
                                 <small>
-                                  {o.actualKg ?? o.kg} kg ·{" "}
-                                  {o.express ? "Express" : "Regular"}
+                                  {o.actualKg ?? o.kg}{" "}
+                                  {unitLabel(
+                                    o.unit ??
+                                      store.services.find(
+                                        (s) => s.id === o.service,
+                                      )?.unit,
+                                  )}{" "}
+                                  · {speedLabel(o.speed, o.express)}
                                 </small>
                               </td>
                               <td>
@@ -646,9 +807,15 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                                 </span>
                               </td>
                               <td>
-                                <span className={o.paid ? "paid" : "unpaid"}>
-                                  {o.paid ? "Lunas" : "Belum dibayar"}
-                                </span>
+                                <PaymentStatus
+                                  paid={o.paid}
+                                  manualPayment={o.manualPayment}
+                                  payment={o.payment}
+                                  reviewRequired={
+                                    o.paymentReconciliationRequired
+                                  }
+                                  compact
+                                />
                               </td>
                               <td>
                                 <button
@@ -683,9 +850,30 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                       Buat pesanan, catat berat aktual, lalu bagikan link
                       tracking.
                     </p>
+                    <div
+                      className="pos-category-tabs"
+                      role="group"
+                      aria-label="Kategori layanan kasir"
+                    >
+                      {serviceCategoryOrder
+                        .filter((category) => category !== "member")
+                        .map((category) => (
+                          <button
+                            type="button"
+                            key={category}
+                            className={
+                              posCategory === category ? "selected" : ""
+                            }
+                            aria-pressed={posCategory === category}
+                            onClick={() => setPosCategory(category)}
+                          >
+                            {serviceCategoryLabels[category]}
+                          </button>
+                        ))}
+                    </div>
                     <div className="service-grid pos-services">
                       {store.services
-                        .filter((s) => s.id !== "member")
+                        .filter((s) => s.category === posCategory)
                         .map((s) => (
                           <button
                             className="service-card"
@@ -698,9 +886,18 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                             <h3>{s.name}</h3>
 
                             <b>
-                              {money(s.price)}
-                              <small> / kg</small>
+                              {money(serviceRate(s))}
+                              <small>
+                                {" "}
+                                /{" "}
+                                {s.packageSize ? `${s.packageSize} kg` : s.unit}
+                              </small>
                             </b>
+                            {s.minimumQuantity && s.minimumQuantity > 1 && (
+                              <small className="pos-service-minimum">
+                                Minimum {s.minimumQuantity} {s.unit}
+                              </small>
+                            )}
                             <span className="card-plus">
                               <Plus size={19} />
                             </span>
@@ -729,6 +926,15 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   save={async (data) => {
                     await action("prices", data);
                     notify("Harga berhasil diperbarui");
+                  }}
+                />
+              )}
+              {adminView === "payments" && store.canManageUsers && (
+                <PaymentSettings
+                  key={branch}
+                  branchId={branch}
+                  onSaved={() => {
+                    void load();
                   }}
                 />
               )}
@@ -776,7 +982,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   onChange={(e) => switchBranch(e.target.value as BranchId)}
                 >
                   <option value="cinere">Cinere</option>
-                  <option value="bogor">Bogor</option>
+                  <option value="bogor">Cibubur</option>
                 </select>
               </label>
               <button
@@ -818,56 +1024,120 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   </div>
                   <span className="small-note">Cabang {branchName}</span>
                 </div>
-                <div className="service-grid">
-                  {store.services.map((s, i) => (
-                    <button
-                      key={s.id}
-                      className={`service-card ${i === 0 ? "featured" : ""}`}
-                      onClick={() =>
-                        s.id === "member" ? setModal("member") : order(s.id)
-                      }
-                    >
-                      <div className="service-top">
-                        <span className="service-icon">
-                          <Icon service={s} />
-                        </span>
-                        {i === 0 && (
-                          <span className="popular">PALING LENGKAP</span>
-                        )}
-                      </div>
-                      <h3>{s.name}</h3>
-
-                      <div className="service-price">
-                        <strong>
-                          {money(s.id === "wash" ? s.price * 10 : s.price)}
-                        </strong>
-                        <span> / {s.id === "wash" ? "10 kg" : s.unit}</span>
-                      </div>
-                      <div className="service-bottom">
-                        <span>
-                          <Clock size={14} />
-                          {s.days}
-                        </span>
-                        <span className="card-plus">
-                          <Plus size={18} />
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+                <div className="service-catalog">
+                  {serviceCategoryOrder.map((category) => {
+                    const group = store.services.filter(
+                      (item) => item.category === category,
+                    );
+                    if (!group.length) return null;
+                    if (category === "daily")
+                      return (
+                        <section className="daily-rate-section" key={category}>
+                          <div className="service-catalog-heading">
+                            <div>
+                              <h3>{serviceCategoryLabels[category]}</h3>
+                              <p>Pilih layanan dan waktu selesai yang sesuai</p>
+                            </div>
+                            <span>Jemput & antar</span>
+                          </div>
+                          <div className="daily-rate-scroll">
+                            <table className="daily-rate-table">
+                              <thead>
+                                <tr>
+                                  <th>Layanan</th>
+                                  {serviceSpeeds.map((speedOption) => (
+                                    <th key={speedOption.id}>
+                                      {speedOption.label}
+                                      <small>{speedOption.days}</small>
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {group.map((item) => (
+                                  <tr key={item.id}>
+                                    <th scope="row">
+                                      <span>{item.name}</span>
+                                      <small>
+                                        Minimum {item.minimumQuantity}{" "}
+                                        {item.unit}
+                                      </small>
+                                      <button
+                                        type="button"
+                                        onClick={() => order(item.id)}
+                                      >
+                                        Pesan
+                                      </button>
+                                    </th>
+                                    {serviceSpeeds.map((speedOption) => (
+                                      <td key={speedOption.id}>
+                                        {money(
+                                          serviceRate(item, speedOption.id),
+                                        )}
+                                        <small>
+                                          /{" "}
+                                          {item.packageSize
+                                            ? `${item.packageSize} kg`
+                                            : item.unit}
+                                        </small>
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+                      );
+                    return (
+                      <section className="service-catalog-group" key={category}>
+                        <div className="service-catalog-heading">
+                          <h3>{serviceCategoryLabels[category]}</h3>
+                          {category === "member" && (
+                            <span>Paket 30 kg · berlaku 30 hari</span>
+                          )}
+                        </div>
+                        <div className="service-item-grid">
+                          {group.map((item) => (
+                            <button
+                              type="button"
+                              className="service-item-card"
+                              key={item.id}
+                              onClick={() =>
+                                item.category === "member"
+                                  ? setModal("member")
+                                  : order(item.id)
+                              }
+                            >
+                              <span className="service-icon">
+                                <Icon service={item} size={21} />
+                              </span>
+                              <span className="service-item-copy">
+                                <b>{item.name}</b>
+                                {item.minimumQuantity &&
+                                  item.minimumQuantity > 1 && (
+                                    <small>
+                                      Minimum {item.minimumQuantity} {item.unit}
+                                    </small>
+                                  )}
+                              </span>
+                              <strong>
+                                {money(item.price)}
+                                <small> / {item.unit}</small>
+                              </strong>
+                              <Plus size={17} />
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    );
+                  })}
                 </div>
                 <div className="pricing-note">
                   <Info size={16} />
                   <span>
-                    Cuci-kering{" "}
-                    {money(
-                      store.services.find((s) => s.id === "wash")!.price * 10,
-                    )}{" "}
-                    hingga 10 kg. Tambahan setrika{" "}
-                    {money(
-                      store.services.find((s) => s.id === "complete")!.price -
-                        store.services.find((s) => s.id === "wash")!.price,
-                    )}
-                    /kg. Express +50%. Ongkir dikonfirmasi toko.
+                    Satu mesin hanya untuk satu pelanggan. Pisahkan cucian
+                    sesuai catatan perawatan. Ongkir dikonfirmasi toko.
                   </span>
                 </div>
               </section>
@@ -895,7 +1165,35 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   <button className="primary">Lacak pesanan</button>
                 </form>
                 {tracked ? (
-                  <Tracking order={tracked} services={store.services} />
+                  <Tracking
+                    order={tracked}
+                    services={store.services}
+                    trackingToken={
+                      /^[0-9a-f-]{36}$/i.test(track.trim())
+                        ? track.trim()
+                        : orders.find((o) => o.id === tracked.id)?.token
+                    }
+                    paymentEnabled={store.paymentEnabled}
+                    onOrderChanged={() => {
+                      void load();
+                      const requestedTrack = track.trim();
+                      if (/^[0-9a-f-]{36}$/i.test(requestedTrack))
+                        void fetch(
+                          `/api/tracking?token=${encodeURIComponent(requestedTrack)}`,
+                          {
+                            cache: "no-store",
+                          },
+                        )
+                          .then(async (response) => {
+                            if (
+                              response.ok &&
+                              activeTrack.current.trim() === requestedTrack
+                            )
+                              setPublicOrder(await response.json());
+                          })
+                          .catch(() => {});
+                    }}
+                  />
                 ) : !store.configured && !track ? (
                   <Tracking
                     order={previewTracking}
@@ -929,10 +1227,24 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                               store.services.find((s) => s.id === o.service)
                                 ?.name
                             }{" "}
-                            · {o.kg} kg
+                            · {o.kg}{" "}
+                            {unitLabel(
+                              o.unit ??
+                                store.services.find((s) => s.id === o.service)
+                                  ?.unit,
+                            )}
                           </small>
                         </span>
-                        <span className="status">{statuses[o.status]}</span>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <span className="status">{statuses[o.status]}</span>
+                          <PaymentStatus
+                            paid={o.paid}
+                            manualPayment={o.manualPayment}
+                            payment={o.payment}
+                            reviewRequired={o.paymentReconciliationRequired}
+                            compact
+                          />
+                        </div>
                       </button>
                     ))}
                   </section>
@@ -1029,14 +1341,45 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
               <Check size={30} />
             </span>
             <p className="eyebrow">PESANAN TERSIMPAN</p>
-            <h2>Selangkah menuju bersih.</h2>
+            <h2>
+              {dashboard ? "Pesanan walk-in tersimpan" : "Pilih pembayaran"}
+            </h2>
             <p>
-              Nomor pesanan kamu <b>{selected.id}</b>. Toko akan mengonfirmasi
-              jadwal dan biaya antar-jemput melalui D’Fable {branchName}.
+              Pesanan <b>{selected.id}</b> tersimpan di D’Fable {branchName}.
+              {dashboard
+                ? " Bagikan link tracking kepada pelanggan setelah selesai."
+                : " Berat aktual dan ongkir akan dikonfirmasi toko."}
             </p>
             <div className="total-line">
-              <span>Estimasi layanan</span>
+              <span>{dashboard ? "Total tagihan" : "Estimasi layanan"}</span>
               <b>{money(selected.total)}</b>
+            </div>
+            <div className="my-5 text-left">
+              <PaymentPanel
+                orderId={selected.id}
+                trackingToken={selected.token}
+                enabled={store.paymentEnabled}
+                initialPaid={
+                  store.orders.find((o) => o.id === selected.id)?.paid ??
+                  selected.paid
+                }
+                initialPayment={
+                  store.orders.find((o) => o.id === selected.id)?.payment ??
+                  selected.payment
+                }
+                initialReviewRequired={
+                  store.orders.find((o) => o.id === selected.id)
+                    ?.paymentReconciliationRequired ??
+                  selected.paymentReconciliationRequired
+                }
+                initialManualPayment={
+                  store.orders.find((o) => o.id === selected.id)
+                    ?.manualPayment ?? selected.manualPayment
+                }
+                onChanged={() => {
+                  void load();
+                }}
+              />
             </div>
             <button
               className="primary"
@@ -1105,9 +1448,13 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
         )}
         {modal === "detail" && selected && (
           <OrderDetail
-            order={store.orders.find((o) => o.id === selected.id)!}
+            order={store.orders.find((o) => o.id === selected.id) || selected}
             services={store.services}
             busy={busy}
+            paymentEnabled={store.paymentEnabled}
+            onPaymentChanged={() => {
+              void load();
+            }}
             save={async (d) => {
               await action("update", d);
               notify("Pesanan berhasil diperbarui");
@@ -1161,8 +1508,13 @@ function OrderForm({
   const [step, setStep] = useState(1);
   const [requestId] = useState(() => crypto.randomUUID());
   const [service, setService] = useState(initialService);
-  const [kg, setKg] = useState(5);
-  const [express, setExpress] = useState(false);
+  const [kg, setKg] = useState(() =>
+    pos
+      ? 0
+      : services.find((item) => item.id === initialService)?.minimumQuantity ||
+        1,
+  );
+  const [speed, setSpeed] = useState<ServiceSpeed>("regular");
   const [lat, setLat] = useState(initialLocation.latitude);
   const [lng, setLng] = useState(initialLocation.longitude);
   const pickupLocationEdited = useRef(false);
@@ -1179,6 +1531,14 @@ function OrderForm({
   });
   const set = (key: string, value: string) =>
     setForm((p) => ({ ...p, [key]: value }));
+  const selectedService =
+    services.find((item) => item.id === service) || services[0];
+  const selectService = (id: string) => {
+    setService(id);
+    const next = services.find((item) => item.id === id);
+    setKg(pos ? 0 : next?.minimumQuantity || 1);
+    setSpeed("regular");
+  };
   useEffect(() => {
     if (pickupLocationEdited.current) return;
     setLat(initialLocation.latitude);
@@ -1224,7 +1584,8 @@ function OrderForm({
             ...form,
             service,
             kg,
-            express,
+            speed,
+            express: speed !== "regular",
             lat,
             lng,
             photo,
@@ -1239,9 +1600,19 @@ function OrderForm({
       <p className="eyebrow">
         {pos ? `KASIR · CABANG ${branchName.toUpperCase()}` : "A FRESH START"}
       </p>
-      <h2>{step === 1 ? "Cucianmu butuh apa?" : "Ke mana kami menjemput?"}</h2>
+      <h2>
+        {step === 1
+          ? pos
+            ? "Catat cucian masuk"
+            : "Cucianmu butuh apa?"
+          : pos
+            ? "Data pelanggan"
+            : "Ke mana kami menjemput?"}
+      </h2>
       <div className="form-steps">
-        <span className={step === 1 ? "active" : ""}>01 Layanan</span>
+        <span className={step === 1 ? "active" : ""}>
+          01 {pos ? "Detail cucian" : "Layanan"}
+        </span>
         <span className={step === 2 ? "active" : ""}>
           02 {pos ? "Data pelanggan" : "Jadwal & alamat"}
         </span>
@@ -1259,7 +1630,7 @@ function OrderForm({
               }
             >
               <option value="cinere">D’Fable Cinere</option>
-              <option value="bogor">D’Fable Bogor</option>
+              <option value="bogor">D’Fable Cibubur</option>
             </select>
             <small>
               Cabang terdekat dari titik jemput dipilih otomatis. Kamu tetap
@@ -1270,99 +1641,207 @@ function OrderForm({
       )}
       {step === 1 ? (
         <>
-          <div className="choice-services">
-            {services
-              .filter((s) => s.id !== "member")
-              .map((s) => (
-                <button
-                  type="button"
-                  key={s.id}
-                  className={service === s.id ? "selected" : ""}
-                  onClick={() => setService(s.id)}
-                >
-                  <Icon service={s} />
+          {pos ? (
+            <div className="pos-selected-service">
+              <span className="pos-selected-service-icon">
+                <Icon service={selectedService} size={21} />
+              </span>
+              <span>
+                <small>Layanan yang dipilih</small>
+                <b>{selectedService.name}</b>
+              </span>
+              <strong>
+                {money(serviceRate(selectedService))}
+                <small>
+                  {selectedService.packageSize
+                    ? ` / ${selectedService.packageSize} kg`
+                    : ` / ${selectedService.unit}`}
+                </small>
+              </strong>
+            </div>
+          ) : (
+            <div className="choice-services">
+              {services
+                .filter((item) => item.category === "daily")
+                .map((s) => (
+                  <button
+                    type="button"
+                    key={s.id}
+                    className={service === s.id ? "selected" : ""}
+                    onClick={() => selectService(s.id)}
+                  >
+                    <Icon service={s} />
+                    <span>
+                      <b>{s.name}</b>
+                      <small>
+                        {money(serviceRate(s))} /{" "}
+                        {s.packageSize ? `${s.packageSize} kg` : s.unit}
+                      </small>
+                    </span>
+                    <span className="radio-dot">
+                      {service === s.id && <Check size={12} />}
+                    </span>
+                  </button>
+                ))}
+              {selectedService.category !== "daily" && (
+                <div className="selected-service-note">
+                  <Icon service={selectedService} size={17} />
                   <span>
-                    <b>{s.name}</b>
+                    <b>{selectedService.name}</b>
                     <small>
-                      {money(s.id === "wash" ? s.price * 10 : s.price)} /{" "}
-                      {s.id === "wash" ? "10 kg" : "kg"}
+                      {money(serviceRate(selectedService))} /{" "}
+                      {selectedService.unit}
                     </small>
                   </span>
-                  <span className="radio-dot">
-                    {service === s.id && <Check size={12} />}
-                  </span>
-                </button>
-              ))}
-          </div>
+                </div>
+              )}
+              <details
+                className="order-other-services"
+                open={selectedService.category !== "daily"}
+              >
+                <summary>Layanan satuan & lainnya</summary>
+                <select
+                  aria-label="Pilih layanan satuan"
+                  value={
+                    selectedService.category === "daily"
+                      ? ""
+                      : selectedService.id
+                  }
+                  onChange={(event) => selectService(event.target.value)}
+                >
+                  <option value="" disabled>
+                    Pilih layanan
+                  </option>
+                  {serviceCategoryOrder
+                    .filter(
+                      (category) =>
+                        category !== "daily" && category !== "member",
+                    )
+                    .map((category) => (
+                      <optgroup
+                        key={category}
+                        label={serviceCategoryLabels[category]}
+                      >
+                        {services
+                          .filter((item) => item.category === category)
+                          .map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name} · {money(item.price)} / {item.unit}
+                            </option>
+                          ))}
+                      </optgroup>
+                    ))}
+                </select>
+              </details>
+            </div>
+          )}
           <label>
-            {pos ? "Berat aktual" : "Perkiraan berat"}
+            {selectedService.unit === "kg"
+              ? pos
+                ? "Berat aktual"
+                : "Perkiraan berat"
+              : `Jumlah ${selectedService.unit}`}
             <div className="weight-control">
               <button
                 aria-label="Kurangi berat"
                 type="button"
-                onClick={() => setKg(Math.max(1, kg - 1))}
+                onClick={() =>
+                  setKg(Math.max(selectedService.minimumQuantity || 1, kg - 1))
+                }
               >
                 <Minus size={17} />
               </button>
               <input
-                aria-label="Berat cucian dalam kg"
+                aria-label={`Jumlah ${selectedService.unit}`}
                 type="number"
-                min={1}
+                min={selectedService.minimumQuantity || 1}
                 max={100}
-                step={0.1}
+                step={selectedService.unit === "kg" ? 0.1 : 1}
                 required
-                value={kg}
+                value={pos && kg === 0 ? "" : kg}
                 onChange={(e) => setKg(Number(e.target.value))}
+                placeholder={
+                  pos
+                    ? `Min. ${selectedService.minimumQuantity || 1}`
+                    : undefined
+                }
               />
-              <span>kg</span>
+              <span>{selectedService.unit}</span>
               <button
                 aria-label="Tambah berat"
                 type="button"
-                onClick={() => setKg(Math.min(100, kg + 1))}
+                onClick={() =>
+                  setKg(
+                    kg === 0
+                      ? selectedService.minimumQuantity || 1
+                      : Math.min(100, kg + 1),
+                  )
+                }
               >
                 <Plus size={17} />
               </button>
             </div>
-            <small>Berat final dikonfirmasi setelah ditimbang di studio.</small>
+            <small>
+              {pos
+                ? "Masukkan hasil timbangan sebelum lanjut."
+                : "Berat final dikonfirmasi setelah ditimbang di studio."}
+            </small>
           </label>
-          <label>Kecepatan layanan</label>
-          <div className="speed-choice">
-            <button
-              className={!express ? "selected" : ""}
-              type="button"
-              onClick={() => setExpress(false)}
-            >
-              <Clock size={18} />
-              <b>Regular</b>
-              <small>2–3 hari</small>
-            </button>
-            <button
-              className={express ? "selected" : ""}
-              type="button"
-              onClick={() => setExpress(true)}
-            >
-              <Wind size={18} />
-              <b>Express</b>
-              <small>24 jam · +50%</small>
-            </button>
-          </div>
-          <label className="upload">
-            {photo ? (
-              <img src={photo} alt="Foto cucian" />
-            ) : (
-              <Camera size={25} />
-            )}
-            <span>
-              <b>{photo ? "Ganti foto cucian" : "Tambahkan foto cucian"}</b>
-              <small>Opsional · JPG, PNG, WebP · maks. 8 MB</small>
-            </span>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => photoRead(e.target.files?.[0])}
-            />
-          </label>
-          {photo && (
+          {selectedService.rates ? (
+            <>
+              <label>Kecepatan layanan</label>
+              <div className="speed-choice">
+                {serviceSpeeds.map((option) => (
+                  <button
+                    className={speed === option.id ? "selected" : ""}
+                    type="button"
+                    key={option.id}
+                    onClick={() => setSpeed(option.id)}
+                  >
+                    {option.id === "regular" ? (
+                      <Clock size={18} />
+                    ) : (
+                      <Wind size={18} />
+                    )}
+                    <b>{option.label}</b>
+                    <small>{option.days}</small>
+                    <strong>
+                      {money(serviceRate(selectedService, option.id))}
+                      <small>
+                        /{" "}
+                        {selectedService.packageSize
+                          ? `${selectedService.packageSize} kg`
+                          : selectedService.unit}
+                      </small>
+                    </strong>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="service-standard-time">
+              <Clock size={15} /> Waktu standar: {selectedService.days}
+            </p>
+          )}
+          {!pos && (
+            <label className="upload">
+              {photo ? (
+                <img src={photo} alt="Foto cucian" />
+              ) : (
+                <Camera size={25} />
+              )}
+              <span>
+                <b>{photo ? "Ganti foto cucian" : "Tambahkan foto cucian"}</b>
+                <small>Opsional · JPG, PNG, WebP · maks. 8 MB</small>
+              </span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => photoRead(e.target.files?.[0])}
+              />
+            </label>
+          )}
+          {!pos && photo && (
             <button
               type="button"
               className="text-button"
@@ -1437,42 +1916,47 @@ function OrderForm({
               </label>
             </>
           )}
-          <div className="form-two">
-            <label>
-              {pos ? "Tanggal masuk" : "Tanggal jemput"}
-              <input
-                type="date"
-                min={today()}
-                required
-                value={form.date}
-                onChange={(e) => set("date", e.target.value)}
-              />
-            </label>
-            <label>
-              Waktu
-              <select
-                value={form.slot}
-                onChange={(e) => set("slot", e.target.value)}
-              >
-                {["09.00–12.00", "12.00–15.00", "15.00–18.00"].map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="notice">
-            <Info size={18} />
-            <span>
-              {pos
-                ? "Pesanan masuk pada tahap ditimbang. Bagikan link tracking setelah tersimpan."
-                : "Jadwal dan ongkir dikonfirmasi toko. Pembayaran transfer dilakukan setelah berat aktual dan tagihan final tersedia."}
-            </span>
-          </div>
-          <label className="checkbox">
-            <input type="checkbox" required /> Saya menyetujui berat final dan
-            ongkir dikonfirmasi toko. Nomor WhatsApp disimpan untuk pesanan ini
-            dan berikutnya.
-          </label>
+          {!pos && (
+            <div className="form-two">
+              <label>
+                Tanggal jemput
+                <input
+                  type="date"
+                  min={today()}
+                  required
+                  value={form.date}
+                  onChange={(e) => set("date", e.target.value)}
+                />
+              </label>
+              <label>
+                Waktu
+                <select
+                  value={form.slot}
+                  onChange={(e) => set("slot", e.target.value)}
+                >
+                  {["09.00–12.00", "12.00–15.00", "15.00–18.00"].map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+          {!pos && (
+            <>
+              <div className="notice">
+                <Info size={18} />
+                <span>
+                  Jadwal dan ongkir dikonfirmasi toko. Pembayaran tersedia
+                  setelah berat aktual dan tagihan final dikonfirmasi.
+                </span>
+              </div>
+              <label className="checkbox">
+                <input type="checkbox" required /> Saya menyetujui berat final
+                dan ongkir dikonfirmasi toko. Nomor WhatsApp disimpan untuk
+                pesanan ini dan berikutnya.
+              </label>
+            </>
+          )}
         </>
       )}
       {error && (
@@ -1482,9 +1966,16 @@ function OrderForm({
       )}
       <div className="form-summary">
         <div>
-          <small>Estimasi layanan {express ? "express" : ""}</small>
-          <strong>{money(estimate(services, service, kg, express))}</strong>
-          <small>Belum termasuk ongkir</small>
+          <small>
+            {pos
+              ? "Total layanan"
+              : `Estimasi · ${speedLabel(speed).toLowerCase()}`}
+          </small>
+          <strong>{money(estimate(services, service, kg, speed))}</strong>
+          <small>
+            {kg} {selectedService.unit} ·{" "}
+            {pos ? "berat/jumlah aktual" : "belum termasuk ongkir"}
+          </small>
         </div>
         <div>
           {step === 2 && (
@@ -1497,7 +1988,13 @@ function OrderForm({
             </button>
           )}
           <button disabled={busy || photoBusy} className="primary">
-            {busy ? "Menyimpan…" : step === 1 ? "Lanjutkan" : "Buat pesanan"}
+            {busy
+              ? "Menyimpan…"
+              : step === 1
+                ? "Lanjutkan"
+                : pos
+                  ? "Simpan pesanan"
+                  : "Buat pesanan"}
           </button>
         </div>
       </div>
@@ -1509,13 +2006,27 @@ function OrderDetail({
   services,
   busy,
   save,
+  paymentEnabled,
+  onPaymentChanged,
 }: {
   order: Order;
   services: Service[];
   busy: boolean;
   save: (data: unknown) => Promise<void>;
+  paymentEnabled?: boolean;
+  onPaymentChanged: () => void;
 }) {
   const [err, setErr] = useState("");
+  const selectedService = services.find((service) => service.id === o.service);
+  const orderUnit = unitLabel(o.unit ?? selectedService?.unit);
+  const quantityStep = orderUnit === "kg" ? "0.1" : "1";
+  const gatewayLocked = Boolean(
+    o.paid ||
+    o.paymentReconciliationRequired ||
+    (o.payment && ["creating", "pending", "paid"].includes(o.payment.status)) ||
+    (o.manualPayment &&
+      ["awaiting_review", "paid"].includes(o.manualPayment.status)),
+  );
   return (
     <form
       onSubmit={async (e) => {
@@ -1526,7 +2037,7 @@ function OrderDetail({
             id: o.id,
             status: Number(f.get("status")),
             actualKg: Number(f.get("weight")),
-            paid: f.get("paid") === "on",
+            paid: o.paid,
             shippingFee:
               f.get("shipping") === "" ? null : Number(f.get("shipping")),
           });
@@ -1570,16 +2081,26 @@ function OrderDetail({
       {o.photo && <AuthorizedPhoto src={o.photo} />}
       <div className="form-two">
         <label>
-          Berat aktual (kg)
+          {orderUnit === "kg"
+            ? "Berat aktual (kg)"
+            : `Jumlah aktual (${orderUnit})`}
           <input
             required
             name="weight"
             type="number"
-            step="0.1"
-            min="0.1"
+            step={quantityStep}
+            min={orderUnit === "kg" ? "0.1" : "1"}
             max="100"
             defaultValue={o.actualKg ?? o.kg}
+            readOnly={gatewayLocked}
+            aria-readonly={gatewayLocked}
           />
+          {o.actualKg === null && (
+            <small className="!text-amber-700">
+              {o.kg} {orderUnit} masih perkiraan. Pastikan jumlah aktual lalu
+              simpan.
+            </small>
+          )}
         </label>
         <label>
           Status
@@ -1602,13 +2123,30 @@ function OrderDetail({
           step="1000"
           placeholder="Belum dikonfirmasi"
           defaultValue={o.shippingFee ?? ""}
+          readOnly={gatewayLocked}
+          aria-readonly={gatewayLocked}
         />
         <small>Isi 0 jika gratis atau pelanggan ambil di toko.</small>
       </label>
-      <label className="checkbox">
-        <input name="paid" type="checkbox" defaultChecked={o.paid} /> Transfer
-        sudah diperiksa toko
-      </label>
+      <div className="my-4">
+        <PaymentStatus
+          paid={o.paid}
+          manualPayment={o.manualPayment}
+          payment={o.payment}
+          reviewRequired={o.paymentReconciliationRequired}
+          compact={false}
+        />
+      </div>
+      {gatewayLocked && (
+        <p className="notice text-sm" role="status">
+          <ShieldCheck size={18} aria-hidden="true" />
+          {o.paid
+            ? "Tagihan sudah lunas dan tidak dapat diubah."
+            : o.manualPayment?.status === "awaiting_review"
+              ? "Bukti transfer sudah diajukan. Periksa pembayaran sebelum mengubah tagihan."
+              : "Tagihan dikunci selama QRIS aktif. Batalkan QR sebelum mengubah berat atau ongkir."}
+        </p>
+      )}
       <div className="total-line">
         <span>Total tagihan saat ini</span>
         <b>{money(o.total)}</b>
@@ -1624,6 +2162,18 @@ function OrderDetail({
       <button disabled={busy} className="primary full">
         {busy ? "Menyimpan…" : "Simpan perubahan"}
       </button>
+      <div className="my-5 text-left">
+        <PaymentPanel
+          orderId={o.id}
+          trackingToken={o.token}
+          enabled={paymentEnabled}
+          initialPaid={o.paid}
+          initialPayment={o.payment}
+          initialReviewRequired={o.paymentReconciliationRequired}
+          initialManualPayment={o.manualPayment}
+          onChanged={onPaymentChanged}
+        />
+      </div>
       <a
         className="text-button full"
         href={`/?track=${o.token}`}
@@ -1650,13 +2200,25 @@ function PriceEditor({
         e.preventDefault();
         setBusy(true);
         const f = new FormData(e.currentTarget);
-        const data = store.services.map((s) => ({
-          id: s.id,
-          price: Number(f.get(s.id)),
-        }));
-        if (data[0].price < data[1].price) {
+        const data = store.services.map((service) => {
+          if (!service.rates)
+            return { id: service.id, price: Number(f.get(service.id)) };
+          const rates = Object.fromEntries(
+            serviceSpeeds.map((speed) => [
+              speed.id,
+              Number(f.get(`${service.id}.${speed.id}`)),
+            ]),
+          ) as Record<ServiceSpeed, number>;
+          return { id: service.id, price: rates.regular, rates };
+        });
+        if (
+          data.some(
+            (service) =>
+              !Number.isFinite(service.price) || service.price < 1000,
+          )
+        ) {
           setMsg(
-            "Harga layanan lengkap tidak boleh lebih murah dari cuci-kering",
+            "Periksa kembali harga. Semua layanan harus memiliki harga yang valid.",
           );
           setBusy(false);
           return;
@@ -1673,26 +2235,79 @@ function PriceEditor({
     >
       <h3>Harga layanan cabang {branches[store.branchId || "cinere"]}</h3>
       <p className="muted">
-        Cuci-kering ditagih minimal 10 kg. Paket lengkap = cuci-kering + selisih
-        tarif lengkap per kg untuk setrika.
+        Satu daftar harga dipakai pelanggan, kasir, dan pesanan baru. Pesanan
+        lama tetap memakai harga saat dibuat.
       </p>
-      {store.services.map((s) => (
-        <label className="price-edit" key={s.id}>
-          <span>
-            <b>{s.name}</b>
-            <small>Rupiah / {s.unit}</small>
-          </span>
-          <input
-            name={s.id}
-            type="number"
-            required
-            min={1000}
-            max={10000000}
-            step={1000}
-            defaultValue={s.price}
-          />
-        </label>
-      ))}
+      <div className="price-editor-catalog">
+        {serviceCategoryOrder.map((category) => {
+          const group = store.services.filter(
+            (service) => service.category === category,
+          );
+          if (!group.length) return null;
+          return (
+            <section
+              className="price-editor-group"
+              data-matrix={category === "daily"}
+              key={category}
+            >
+              <h4>{serviceCategoryLabels[category]}</h4>
+              {category === "daily" && (
+                <div className="price-editor-speed-head">
+                  <span>Harga satuan</span>
+                  {serviceSpeeds.map((speed) => (
+                    <span key={speed.id}>{speed.label}</span>
+                  ))}
+                </div>
+              )}
+              {group.map((service) => (
+                <div className="price-editor-row" key={service.id}>
+                  <span className="price-editor-name">
+                    <b>{service.name}</b>
+                    <small>
+                      {service.packageSize
+                        ? `per ${service.packageSize} kg · minimum ${service.minimumQuantity} kg`
+                        : `per ${service.unit}${service.minimumQuantity && service.minimumQuantity > 1 ? ` · minimum ${service.minimumQuantity} ${service.unit}` : ""}`}
+                    </small>
+                  </span>
+                  {service.rates ? (
+                    serviceSpeeds.map((speed) => (
+                      <label className="price-editor-input" key={speed.id}>
+                        <span className="sr-only">
+                          {service.name}, {speed.label}
+                        </span>
+                        <input
+                          aria-label={`${service.name}, ${speed.label}`}
+                          name={`${service.id}.${speed.id}`}
+                          type="number"
+                          required
+                          min={1000}
+                          max={10000000}
+                          step={1000}
+                          defaultValue={serviceRate(service, speed.id)}
+                        />
+                      </label>
+                    ))
+                  ) : (
+                    <label className="price-editor-input price-editor-single">
+                      <span className="sr-only">Harga {service.name}</span>
+                      <input
+                        aria-label={`Harga ${service.name}`}
+                        name={service.id}
+                        type="number"
+                        required
+                        min={1000}
+                        max={10000000}
+                        step={1000}
+                        defaultValue={service.price}
+                      />
+                    </label>
+                  )}
+                </div>
+              ))}
+            </section>
+          );
+        })}
+      </div>
       <button disabled={busy} className="primary">
         Simpan harga
       </button>

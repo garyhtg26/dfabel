@@ -11,6 +11,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "./auth-provider";
+import { authErrorMessage } from "@/lib/auth-error";
 export default function AccountPanel({
   onDone,
   phone = "",
@@ -42,22 +43,7 @@ export default function AccountPanel({
     try {
       await action();
     } catch (e) {
-      const code = (e as { code?: string }).code;
-      setError(
-        code === "auth/operation-not-allowed"
-          ? "Metode login ini belum diaktifkan di Firebase Authentication."
-          : code === "auth/email-already-in-use"
-            ? "Email sudah terdaftar. Silakan masuk atau atur ulang password."
-            : code === "auth/unauthorized-domain"
-              ? "Domain ini belum diizinkan untuk login."
-              : code === "auth/too-many-requests"
-                ? "Terlalu banyak percobaan. Coba kembali beberapa saat lagi."
-                : code === "auth/popup-closed-by-user"
-                  ? "Login Google dibatalkan."
-                  : code === "auth/unauthorized-continue-uri"
-                    ? "Domain aplikasi belum ditambahkan ke Authorized domains Firebase."
-                    : "Belum berhasil. Periksa email, password, dan koneksi kamu.",
-      );
+      setError(authErrorMessage(e, window.location.hostname));
     } finally {
       setBusy(false);
     }

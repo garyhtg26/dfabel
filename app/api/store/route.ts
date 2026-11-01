@@ -13,15 +13,19 @@ import {
   sameOrigin,
 } from "@/lib/firebase/access";
 import { defaultStore } from "@/lib/defaults";
-import { calculatePrice } from "@/lib/pricing";
+import { calculateOrderPrice } from "@/lib/pricing";
+import { normalizeServices, serviceUnitRate } from "@/lib/catalog";
 import {
   orderSchema,
   updateSchema,
   pricesSchema,
   promoSchema,
 } from "@/lib/order-validation";
-import type { Order, Service } from "@/lib/types";
+import type { Order } from "@/lib/types";
 import { serverFailure } from "@/lib/server-diagnostics";
+import { paymentLocked } from "@/lib/payments/policy";
+import { manualLocked } from "@/lib/payments/manual-policy";
+import { signalPaymentChange } from "@/lib/payments/service";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -114,14 +118,38 @@ export async function POST(req: NextRequest) {
         );
         if (attempts.length >= (user.admin ? 120 : 10))
           throw new ApiError(429, "Terlalu banyak pesanan. Coba lagi nanti.");
-        const services = (settings.get("services") ||
-          defaultStore.services) as Service[];
-        const price = services.find((s) => s.id === input.service)!.price;
-        const washPrice = services.find((s) => s.id === "wash")!.price;
+        const services = normalizeServices(settings.get("services"));
+        const service = services.find((item) => item.id === input.service);
+        if (!service)
+          throw new ApiError(400, "Layanan yang dipilih tidak tersedia.");
+        const speed = input.speed || "regular";
+        if (!service.rates && speed !== "regular")
+          throw new ApiError(
+            400,
+            "Kecepatan ini tidak tersedia untuk layanan.",
+          );
+        if (input.kg < (service.minimumQuantity || 1))
+          throw new ApiError(
+            400,
+            `Jumlah minimum layanan ini ${service.minimumQuantity || 1} ${service.unit}.`,
+          );
+        if (service.unit !== "kg" && !Number.isInteger(input.kg))
+          throw new ApiError(400, "Jumlah item harus berupa bilangan bulat.");
+        const unitPrice = serviceUnitRate(service, speed);
+        const washService = services.find((item) => item.id === "wash")!;
+        const washPrice = serviceUnitRate(washService);
         const now = new Date().toISOString();
-        const { requestId, photo, ...clean } = input;
+        const { requestId, photo, ...cleanInput } = input;
         void requestId;
         void photo;
+        const clean = {
+          ...cleanInput,
+          express: speed !== "regular",
+          unit: service.unit,
+          speed,
+          pricingVersion: 2 as const,
+          minimumQuantity: service.minimumQuantity || 1,
+        };
         const status = input.source === "pos" ? 3 : 0;
         const token = randomUUID();
         const order: Order = {
@@ -134,14 +162,15 @@ export async function POST(req: NextRequest) {
           status,
           paid: false,
           shippingFee: input.source === "pos" ? 0 : null,
-          total: calculatePrice(
-            input.service,
+          total: calculateOrderPrice(
+            {
+              ...clean,
+              unitPrice,
+              washPrice,
+            },
             input.kg,
-            price,
-            washPrice,
-            input.express,
           ),
-          unitPrice: price,
+          unitPrice,
           washPrice,
           photo: "",
           photoPath,
@@ -191,14 +220,27 @@ export async function POST(req: NextRequest) {
           throw new ApiError(400, "Status tidak boleh mundur.");
         if (v.paid && v.shippingFee === null)
           throw new ApiError(400, "Konfirmasi ongkir sebelum menandai lunas.");
-        const total =
-          calculatePrice(
-            o.service,
-            v.actualKg,
-            o.unitPrice,
-            o.washPrice,
-            o.express,
-          ) + (v.shippingFee ?? 0);
+        if (o.unit && o.unit !== "kg" && !Number.isInteger(v.actualKg))
+          throw new ApiError(400, "Jumlah aktual item harus bilangan bulat.");
+        const total = calculateOrderPrice(o, v.actualKg) + (v.shippingFee ?? 0);
+        if (v.paid !== o.paid)
+          throw new ApiError(
+            409,
+            "Periksa bukti transfer melalui menu pembayaran untuk mengonfirmasi tagihan. Status lunas tidak dapat diubah dari form pesanan.",
+          );
+        if (
+          (paymentLocked(o.payment) ||
+            manualLocked(o.manualPayment) ||
+            o.paid ||
+            o.paymentReconciliationRequired) &&
+          (total !== o.total ||
+            v.actualKg !== o.actualKg ||
+            v.shippingFee !== o.shippingFee)
+        )
+          throw new ApiError(
+            409,
+            "Tagihan terkunci selama pembayaran sedang diperiksa atau sudah lunas. Periksa pembayaran terlebih dahulu.",
+          );
         if (o.paid && v.paid && total !== o.total)
           throw new ApiError(
             400,
@@ -214,9 +256,17 @@ export async function POST(req: NextRequest) {
           paid: v.paid,
           total,
           history,
+          paymentRevision: (o.paymentRevision || 0) + 1,
           updatedBy: user.uid,
           updatedAt: new Date().toISOString(),
         });
+        if (
+          total !== o.total ||
+          v.actualKg !== o.actualKg ||
+          v.shippingFee !== o.shippingFee ||
+          v.paid !== o.paid
+        )
+          signalPaymentChange(tx, database, o.branchId);
       });
     } else if (body.action === "prices") {
       requireManager(user);
@@ -225,10 +275,34 @@ export async function POST(req: NextRequest) {
         const ref = database.doc(`settings/${branch}`);
         const snap = await tx.get(ref);
         const settings = { ...defaultStore, ...snap.data() };
-        const services = (settings.services as Service[]).map((s) => ({
-          ...s,
-          price: prices.find((v) => v.id === s.id)!.price,
-        }));
+        const currentServices = normalizeServices(settings.services);
+        if (
+          prices.length !== currentServices.length ||
+          currentServices.some(
+            (service) =>
+              prices.some((price) => price.id === service.id) === false,
+          )
+        )
+          throw new ApiError(400, "Daftar layanan harus lengkap.");
+        const services = currentServices.map((service) => {
+          const update = prices.find((price) => price.id === service.id)!;
+          if (service.rates && !update.rates)
+            throw new ApiError(
+              400,
+              `Tarif kecepatan ${service.name} belum lengkap.`,
+            );
+          if (!service.rates && update.rates)
+            throw new ApiError(
+              400,
+              `Tarif kecepatan ${service.name} tidak digunakan.`,
+            );
+          const rates = service.rates ? update.rates! : undefined;
+          return {
+            ...service,
+            price: rates?.regular ?? update.price,
+            ...(rates ? { rates } : {}),
+          };
+        });
         tx.set(
           ref,
           { services, promo: settings.promo, updatedBy: user.uid },
@@ -244,7 +318,7 @@ export async function POST(req: NextRequest) {
         tx.set(
           ref,
           {
-            services: snap.get("services") || defaultStore.services,
+            services: normalizeServices(snap.get("services")),
             promo,
             updatedBy: user.uid,
           },
