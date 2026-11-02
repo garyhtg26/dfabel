@@ -23,20 +23,23 @@ export function calculateOrderPrice(
     express: boolean;
     pricingVersion?: number;
     minimumQuantity?: number;
+    membershipDiscount?: boolean;
   },
   quantity = order.kg,
 ) {
-  if (order.pricingVersion === 2)
-    return Math.round(
-      Math.max(order.minimumQuantity || 1, quantity) * order.unitPrice,
-    );
-  return calculatePrice(
-    order.service,
-    quantity,
-    order.unitPrice,
-    order.washPrice,
-    order.express,
-  );
+  const price =
+    order.pricingVersion === 2
+      ? Math.round(
+          Math.max(order.minimumQuantity || 1, quantity) * order.unitPrice,
+        )
+      : calculatePrice(
+          order.service,
+          quantity,
+          order.unitPrice,
+          order.washPrice,
+          order.express,
+        );
+  return order.membershipDiscount ? Math.round(price * 0.8) : price;
 }
 
 export function normalizePhone(phone: string) {

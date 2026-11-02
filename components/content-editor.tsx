@@ -13,7 +13,7 @@ import type { Store } from "@/lib/types";
 const labels: Record<MediaSlot, string> = {
   promo: "Promo utama",
   people: "Jemput & antar",
-  member: "Paket bulanan",
+  member: "Membership",
   wash: "Cuci Kering Lipat",
   complete: "Cuci Kering Setrika",
   iron: "Setrika Kiloan",
@@ -120,7 +120,7 @@ export default function ContentEditor({
               {key === "people"
                 ? "Jemput & antar"
                 : key === "member"
-                  ? "Paket bulanan"
+                  ? "Membership"
                   : "Lacak pesanan"}
             </legend>
             <label>

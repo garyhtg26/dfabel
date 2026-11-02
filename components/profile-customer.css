@@ -146,7 +146,8 @@
   min-height: 46px;
   padding: 11px 21px;
 }
-.profile-points-column {
+.profile-points-column,
+.profile-details-column {
   display: grid;
   gap: 20px;
   min-width: 0;
@@ -351,8 +352,21 @@
   .profile-layout {
     grid-template-columns: minmax(0, 1fr);
   }
-  .profile-points-column {
-    grid-row: 1;
+  .profile-points-column,
+  .profile-details-column {
+    display: contents;
+  }
+  .profile-points-card {
+    order: 1;
+  }
+  .member-summary {
+    order: 2;
+  }
+  .profile-details {
+    order: 3;
+  }
+  .profile-history {
+    order: 4;
   }
   .profile-points-card {
     padding: 22px;

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { identity, sameOrigin, ApiError } from "@/lib/firebase/access";
 import { adminAuth, db } from "@/lib/firebase/admin";
 import { normalizePhone } from "@/lib/pricing";
+import { phoneFromLoginEmail } from "@/lib/phone-auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
@@ -15,12 +16,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         name: user.displayName || "",
-        email: user.email || "",
+        email: actor.email,
         photoVersion: profile.get("photoVersion") || "",
         profile: {
           name: profile.get("name") || user.displayName || "",
-          email: user.email || "",
+          email: actor.email,
           phone: profile.get("phone") || "",
+          loginPhone: !actor.email ? phoneFromLoginEmail(user.email) : null,
         },
       },
       { headers: { "Cache-Control": "private, no-store" } },

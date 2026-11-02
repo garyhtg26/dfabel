@@ -6,6 +6,7 @@ export function publicTracking(o: Order): TrackingOrder {
   return {
     id: o.id,
     service: o.service,
+    ...(o.source ? { source: o.source } : {}),
     unit: o.unit,
     speed: o.speed,
     pricingVersion: o.pricingVersion,
@@ -36,6 +37,9 @@ export function publicTracking(o: Order): TrackingOrder {
       : {}),
     branchId: o.branchId,
     total: o.total,
+    ...(o.insurance ? { insurance: true } : {}),
+    ...(o.membershipDiscount ? { membershipDiscount: true } : {}),
+    ...(o.membershipUsed ? { membershipUsed: o.membershipUsed } : {}),
     ...(o.pointsUsed ? { pointsUsed: o.pointsUsed } : {}),
     ...(o.pointsEarned ? { pointsEarned: o.pointsEarned } : {}),
     shippingFee: o.shippingFee,

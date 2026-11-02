@@ -88,6 +88,8 @@ test("public tracking excludes customer PII, coordinates, photos, auth UID and t
   } as Order;
   const output = publicTracking(order);
   assert.equal(output.status, 6);
+  assert.equal(output.source, "web");
+  assert.equal(publicTracking({ ...order, source: "pos" }).source, "pos");
   for (const key of [
     "token",
     "uid",

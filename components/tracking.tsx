@@ -1,22 +1,28 @@
 "use client";
+import Link from "next/link";
 import {
+  CalendarDays,
   Check,
+  ClipboardList,
+  Clock,
+  PackageCheck,
+  ReceiptText,
+  Scale,
+  ShieldCheck,
+  Sparkles,
   Truck,
   WashingMachine,
-  PackageCheck,
-  House,
-  Clock,
-  MapPin,
-  ShieldCheck,
-  ReceiptText,
-  Package,
-  Shirt,
+  CircleCheck,
 } from "lucide-react";
 import { money, statuses, type TrackingOrder, type Service } from "@/lib/types";
 import { branches, isBranchId } from "@/lib/branches";
 import { speedLabel, unitLabel } from "@/lib/catalog";
 import PaymentPanel from "./payment-panel";
 import LoyaltyRedemption from "./loyalty-redemption";
+import MembershipRedemption from "./membership-redemption";
+import { useAuth } from "./auth-provider";
+import "./tracking.css";
+
 export const previewTracking: TrackingOrder = {
   id: "DF-CONTOH",
   branchId: "cinere",
@@ -39,6 +45,17 @@ export const previewTracking: TrackingOrder = {
     { status: 6, at: "2026-10-06T08:00:00.000Z" },
   ],
 };
+
+const stepIcons = [
+  ClipboardList,
+  CalendarDays,
+  Truck,
+  Scale,
+  WashingMachine,
+  Sparkles,
+  Truck,
+  CircleCheck,
+];
 export default function Tracking({
   order: o,
   services,
@@ -56,124 +73,101 @@ export default function Tracking({
   onOrderChanged?: () => void;
   isOwner?: boolean;
 }) {
-  const stage = o.status < 3 ? 0 : o.status < 6 ? 1 : o.status === 6 ? 2 : 3;
-  const phases = [
-    { icon: Package, name: "Dijemput" },
-    { icon: WashingMachine, name: "Dirawat" },
-    { icon: Truck, name: "Diantar" },
-    { icon: House, name: "Selesai" },
-  ];
+  const auth = useAuth();
+  const currentStatus = Math.max(0, Math.min(statuses.length - 1, o.status));
+  const startStep = o.source === "pos" ? 3 : 0;
+  const StatusIcon = stepIcons[currentStatus] || ClipboardList;
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+    <div>
       {preview && (
-        <div className="bg-amber-50 px-6 py-3 text-xs text-amber-800">
+        <div className="mb-3 rounded-xl bg-amber-50 px-5 py-3 text-xs text-amber-800">
           Contoh tampilan tracking · Bukan pesanan atau posisi kurir asli
         </div>
       )}
-      <div className="grid lg:grid-cols-[1.3fr_1fr]">
-        <section className="relative overflow-hidden bg-[#2521df] px-6 pb-7 pt-7 text-white sm:px-9 sm:pb-9">
-          <div className="flex items-center justify-between gap-3">
-            <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-medium tracking-[.12em]">
-              STATUS DARI TOKO
-            </span>
-            <span className="text-xs text-indigo-200">{o.id}</span>
-          </div>
-          <div className="mb-10 mt-8 flex items-start justify-between gap-3">
-            <div>
-              <h2 className="!mb-3 !text-[30px] !leading-tight tracking-tight sm:!text-4xl">
-                {stage === 3 ? (
-                  <>
-                    Pesanan selesai.
-                    <br />
-                    Terima kasih!
-                  </>
-                ) : stage === 2 ? (
-                  <>
-                    Cucianmu
-                    <br />
-                    sedang diantar.
-                  </>
-                ) : stage === 1 ? (
-                  <>
-                    Cucianmu sedang
-                    <br />
-                    kami proses.
-                  </>
-                ) : (
-                  <>
-                    Pesananmu
-                    <br />
-                    sudah kami terima.
-                  </>
-                )}
-              </h2>
-              <p className="!mb-0 text-sm text-indigo-200">
-                {statuses[o.status]}
-              </p>
+      <div className="tracking-detail-grid">
+        <section className="tracking-progress-card" aria-label="Status pesanan">
+          <div className="tracking-status-hero">
+            <div className="tracking-status-top">
+              <b>STATUS PESANAN</b>
+              <span>{o.id}</span>
             </div>
-            <span className="mt-1 flex size-16 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 sm:size-20">
-              {stage === 3 ? (
-                <PackageCheck size={38} strokeWidth={1.3} />
-              ) : stage === 2 ? (
-                <Truck size={38} strokeWidth={1.3} />
-              ) : (
-                <Shirt size={38} strokeWidth={1.3} />
-              )}
-            </span>
-          </div>
-          <div
-            className="relative flex justify-between"
-            aria-label={`Tahap ${stage + 1} dari 4`}
-          >
-            <div className="absolute left-[6%] right-[6%] top-5 h-1 rounded-full bg-white/20">
-              <div
-                className="h-full rounded-full bg-white transition-all duration-700"
-                style={{ width: `${(stage / 3) * 100}%` }}
-              />
-            </div>
-            {phases.map(({ icon: Icon, name }, i) => (
-              <div
-                key={name}
-                className="relative z-10 flex w-1/4 flex-col items-center gap-3"
-              >
-                <span
-                  className={`flex size-11 items-center justify-center rounded-full border-4 border-[#2521df] ${i <= stage ? "bg-white text-indigo-600" : "bg-[#625ff0] text-indigo-200"}`}
-                >
-                  {i < stage ? <Check size={19} /> : <Icon size={19} />}
-                </span>
-                <span
-                  className={`text-[11px] ${i === stage ? "font-semibold text-white" : "text-indigo-200"}`}
-                >
-                  {name}
-                </span>
+            <div className="tracking-status-title">
+              <span>
+                <StatusIcon size={23} />
+              </span>
+              <div>
+                <h2>{statuses[currentStatus]}</h2>
+                <p>
+                  {currentStatus === 7
+                    ? "Pesanan sudah selesai."
+                    : "Status diperbarui oleh toko."}
+                </p>
               </div>
-            ))}
+            </div>
           </div>
-          <div className="mt-8 flex items-center gap-3 rounded-xl border border-white/15 bg-white/10 p-4">
-            <Clock size={20} className="shrink-0 text-indigo-200" />
-            <div>
-              <b className="block text-sm font-medium">
-                {stage === 3 ? "Pesanan selesai" : "Pantau pesanan di sini"}
-              </b>
-              <span className="text-xs text-indigo-200">
-                Status diperbarui oleh toko. Posisi kurir tidak ditampilkan.
+          <div className="tracking-progress-body">
+            <div className="tracking-progress-heading">
+              <h3>Proses cucian</h3>
+              <span>
+                Tahap {Math.max(1, currentStatus - startStep + 1)} dari{" "}
+                {statuses.length - startStep}
               </span>
             </div>
+            <ol className="tracking-steps">
+              {statuses.map((status, index) => {
+                if (index < startStep) return null;
+                const Icon = stepIcons[index];
+                const isCurrent = index === currentStatus;
+                return (
+                  <li
+                    className={
+                      isCurrent
+                        ? "current"
+                        : index < currentStatus
+                          ? "done"
+                          : ""
+                    }
+                    key={status}
+                    aria-current={isCurrent ? "step" : undefined}
+                  >
+                    <span className="tracking-step-icon">
+                      {index < currentStatus ? (
+                        <Check size={16} />
+                      ) : (
+                        <Icon size={16} />
+                      )}
+                    </span>
+                    <span className="tracking-step-copy">
+                      {status}
+                      {isCurrent && <small>Status saat ini</small>}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+            <p className="tracking-progress-note">
+              <Clock size={15} /> Status diperbarui oleh toko; lokasi kurir
+              tidak ditampilkan secara langsung.
+            </p>
           </div>
         </section>
-        <section className="p-6 sm:p-8">
-          <div className="mb-5 flex items-start justify-between">
+        <section
+          className="tracking-order-card"
+          aria-label="Rincian dan pembayaran"
+        >
+          <div className="tracking-order-top">
             <div>
               <p className="!mb-1 text-xs text-slate-400">RINCIAN PESANAN</p>
-              <h3 className="!mb-0 !text-lg">
-                {services.find((s) => s.id === o.service)?.name}
+              <h3>
+                {services.find((s) => s.id === o.service)?.name ||
+                  "Layanan laundry"}
               </h3>
             </div>
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-500">
-              <ReceiptText size={21} />
+            <span className="tracking-order-icon">
+              <ReceiptText size={20} />
             </span>
           </div>
-          <div className="flex gap-2 text-xs text-slate-500">
+          <div className="mt-5 flex flex-wrap gap-2 text-xs text-slate-500">
             <span className="rounded-lg bg-slate-50 px-3 py-2">
               {o.actualKg ?? o.kg}{" "}
               {unitLabel(
@@ -189,9 +183,7 @@ export default function Tracking({
             <div className="flex justify-between gap-3">
               <span className="text-slate-400">Cabang</span>
               <b className="font-medium">
-                {"branchId" in o && isBranchId(o.branchId)
-                  ? branches[o.branchId]
-                  : "Cinere"}
+                {isBranchId(o.branchId) ? branches[o.branchId] : "Cinere"}
               </b>
             </div>
             <div className="flex justify-between gap-3">
@@ -201,7 +193,7 @@ export default function Tracking({
                 <small className="block text-slate-400">{o.slot}</small>
               </b>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between gap-3">
               <span className="text-slate-400">Ongkir</span>
               <span>
                 {o.shippingFee === null
@@ -211,11 +203,34 @@ export default function Tracking({
                     : money(o.shippingFee)}
               </span>
             </div>
+            {o.insurance && (
+              <div className="flex justify-between gap-3">
+                <span className="text-slate-400">Perlindungan cucian</span>
+                <span>{money(1000)}</span>
+              </div>
+            )}
           </div>
           {isOwner && !preview && (
-            <LoyaltyRedemption order={o} onChanged={onOrderChanged} />
+            <>
+              <MembershipRedemption order={o} onChanged={onOrderChanged} />
+              <LoyaltyRedemption order={o} onChanged={onOrderChanged} />
+            </>
           )}
-          <div className="mb-5 flex items-center justify-between">
+          {!preview && !isOwner && !auth.user && !o.paid && (
+            <section className="loyalty-login-hint" aria-label="Poin D’Fable">
+              <b>Punya poin D’Fable?</b>
+              <p>
+                Masuk dengan akun pemilik pesanan untuk menggunakan poin. Jika
+                pesanan toko belum terhubung ke akunmu, minta bantuan staf.
+              </p>
+              <Link
+                href={`/?account=1${trackingToken ? `&track=${encodeURIComponent(trackingToken)}` : "&view=tracking"}`}
+              >
+                Masuk untuk cek poin
+              </Link>
+            </section>
+          )}
+          <div className="mb-5 flex items-center justify-between gap-3">
             <span className="text-sm text-slate-500">
               {o.actualKg === null || o.shippingFee === null
                 ? "Estimasi total"
@@ -231,7 +246,7 @@ export default function Tracking({
             </div>
           ) : (
             <PaymentPanel
-              key={`${o.id}-${o.pointsUsed || 0}-${o.paid}`}
+              key={`${o.id}-${o.pointsUsed || 0}-${o.membershipUsed || 0}-${o.paid}`}
               orderId={o.id}
               trackingToken={trackingToken}
               enabled={paymentEnabled}
@@ -245,14 +260,14 @@ export default function Tracking({
           )}
         </section>
       </div>
-      <section className="border-t border-slate-100 p-6 sm:p-8">
-        <h3 className="!mb-6 !text-base">Riwayat pesanan</h3>
-        <ol className="grid list-none gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="tracking-history-card">
+        <h3>Riwayat pesanan</h3>
+        <ol className="tracking-history-list">
           {o.history
             .slice()
             .reverse()
             .map((h, i) => (
-              <li key={`${h.status}-${h.at}`} className="flex gap-3">
+              <li key={`${h.status}-${h.at}`} className="flex min-w-0 gap-3">
                 <span
                   className={`flex size-8 shrink-0 items-center justify-center rounded-full ${i === 0 ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-400"}`}
                 >

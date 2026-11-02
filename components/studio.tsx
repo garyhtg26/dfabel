@@ -1,8 +1,12 @@
 "use client";
+
+import { paidOrderSalesValue } from "@/lib/sales";
 import { useState, useEffect, useRef, type FormEvent } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import CustomerHome from "./customer-home";
+import OverviewCharts from "./overview-charts";
+import StaffOrderDetail, { StaffReceipt } from "./staff-order-detail";
 import CustomerAccount from "./customer-account";
 import ScrollReveal from "./scroll-reveal";
 import { useAuth } from "./auth-provider";
@@ -20,11 +24,11 @@ import {
 import ContentEditor from "./content-editor";
 import Tracking, { previewTracking } from "./tracking";
 import PaymentPanel from "./payment-panel";
+import LoyaltyRedemption from "./loyalty-redemption";
 import PaymentSettings from "./payment-settings";
 import PaymentStatus from "./payment-status";
 import { consumePaymentEvents } from "@/lib/payment-stream";
 import { requestBranchStore } from "@/lib/branch-loading";
-import AuthorizedPhoto from "./authorized-photo";
 import type { TrackingOrder } from "@/lib/types";
 import {
   serviceCategoryLabels,
@@ -69,6 +73,7 @@ import {
   Layers,
   ShieldCheck,
   Store as StoreIcon,
+  Printer,
 } from "lucide-react";
 import {
   money,
@@ -415,6 +420,9 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
     setToast(message);
   }
   const orders = store?.orders || [];
+  const currentSelected = selected
+    ? orders.find((order) => order.id === selected.id) || selected
+    : null;
   const myOrders = orders.filter((o) => auth.user && o.uid === auth.user.uid);
   const visible = orders.filter(
     (o) =>
@@ -469,14 +477,10 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
         <AccountPanel admin phone={profile.phone} onDone={() => load()} />
       </main>
     );
-  const revenue = orders
-    .filter(
-      (o) =>
-        o.paid &&
-        !o.paymentReconciliationRequired &&
-        o.payment?.environment !== "sandbox",
-    )
-    .reduce((a, o) => a + o.total, 0);
+  const revenue = orders.reduce(
+    (sum, order) => sum + paidOrderSalesValue(order),
+    0,
+  );
   const pendingPayments = orders.filter(
     (o) =>
       o.manualPayment?.status === "awaiting_review" ||
@@ -639,7 +643,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   )}
                   <div className="metrics" data-scroll-reveal>
                     {[
-                      [Wallet, "Penjualan terbayar", money(revenue)],
+                      [Wallet, "Nilai penjualan lunas", money(revenue)],
                       [ShoppingBag, "Total pesanan", orders.length],
                       [
                         WashingMachine,
@@ -661,14 +665,17 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                           </span>
                           <strong>{value as string | number}</strong>
                           <small>
-                            {store.hasMore
-                              ? "500 pesanan terbaru"
-                              : "Seluruh pesanan"}
+                            {label === "Nilai penjualan lunas"
+                              ? `Termasuk saldo membership · bukan uang diterima${store.hasMore ? " · 500 pesanan terbaru" : ""}`
+                              : store.hasMore
+                                ? "500 pesanan terbaru"
+                                : "Seluruh pesanan"}
                           </small>
                         </div>
                       );
                     })}
                   </div>
+                  <OverviewCharts orders={orders} hasMore={store.hasMore} />
                   <div className="admin-two" data-scroll-reveal>
                     <section className="panel">
                       <div className="section-heading">
@@ -1107,7 +1114,10 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                         >
                           <h3>{serviceCategoryLabels[category]}</h3>
                           {category === "member" && (
-                            <span>Paket 30 kg · berlaku 30 hari</span>
+                            <span>
+                              Deposit mulai Rp100.000 · diskon 20% selama saldo
+                              tersedia
+                            </span>
                           )}
                         </div>
                         <div className="service-item-grid">
@@ -1127,7 +1137,11 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                                 <Icon service={item} size={21} />
                               </span>
                               <span className="service-item-copy">
-                                <b>{item.name}</b>
+                                <b>
+                                  {category === "member"
+                                    ? "Membership D’Fable"
+                                    : item.name}
+                                </b>
                                 {item.minimumQuantity &&
                                   item.minimumQuantity > 1 && (
                                     <small>
@@ -1136,8 +1150,16 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                                   )}
                               </span>
                               <strong>
-                                {money(item.price)}
-                                <small> / {item.unit}</small>
+                                {money(
+                                  category === "member" ? 100000 : item.price,
+                                )}
+                                <small>
+                                  {" "}
+                                  /{" "}
+                                  {category === "member"
+                                    ? "deposit"
+                                    : item.unit}
+                                </small>
                               </strong>
                               <Plus size={17} />
                             </button>
@@ -1321,10 +1343,16 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
         }}
         className={
           modal === "order"
-            ? "order-dialog"
+            ? dashboard
+              ? "order-dialog dashboard-dialog"
+              : "order-dialog"
             : modal === "login"
               ? "auth-dialog"
-              : ""
+              : modal === "detail"
+                ? "staff-detail-dialog"
+                : dashboard
+                  ? "dashboard-dialog"
+                  : ""
         }
       >
         <button
@@ -1362,7 +1390,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
             }}
           />
         )}
-        {modal === "success" && selected && (
+        {modal === "success" && selected && currentSelected && (
           <div className="success">
             <span className="success-icon">
               <Check size={30} />
@@ -1379,13 +1407,23 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
             </p>
             <div className="total-line">
               <span>{dashboard ? "Total tagihan" : "Estimasi layanan"}</span>
-              <b>{money(selected.total)}</b>
+              <b>{money(currentSelected.total)}</b>
             </div>
             <div className="my-5 text-left">
+              {!dashboard && auth.user?.uid === currentSelected.uid && (
+                <LoyaltyRedemption
+                  order={currentSelected}
+                  onChanged={() => {
+                    void load();
+                  }}
+                />
+              )}
               <PaymentPanel
+                key={`${currentSelected.id}-${currentSelected.pointsUsed || 0}-${currentSelected.membershipUsed || 0}-${currentSelected.paid}`}
                 orderId={selected.id}
                 trackingToken={selected.token}
                 enabled={store.paymentEnabled}
+                hideQrByDefault={dashboard}
                 initialPaid={
                   store.orders.find((o) => o.id === selected.id)?.paid ??
                   selected.paid
@@ -1408,6 +1446,23 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                 }}
               />
             </div>
+            {dashboard && (
+              <>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => window.print()}
+                >
+                  <Printer size={17} /> Cetak struk / PDF
+                </button>
+                <StaffReceipt
+                  order={
+                    store.orders.find((o) => o.id === selected.id) || selected
+                  }
+                  services={store.services}
+                />
+              </>
+            )}
             <button
               className="primary"
               onClick={async () => {
@@ -1450,31 +1505,33 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
             <span className="service-icon">
               <Layers />
             </span>
-            <p className="eyebrow">D’FABLE MONTHLY</p>
-            <h2>Paket bulanan</h2>
+            <p className="eyebrow">D’FABLE MEMBERSHIP</p>
+            <h2>Lebih hemat dengan membership</h2>
             <p className="muted">
-              {money(store.services.find((s) => s.id === "member")!.price)} / 30
-              hari untuk 30 kg cuci-kering regular. Detail aktivasi dan
-              penggunaan paket akan dikonfirmasi oleh tim D’Fable melalui
-              WhatsApp.
+              Deposit mulai Rp100.000 dapat digunakan untuk membayar layanan
+              laundry. Setelah deposit dikonfirmasi, nikmati diskon 20% untuk
+              layanan selama saldo masih tersedia saat pesanan dibuat.
             </p>
             <div className="notice">
-              <Info size={20} /> Tim toko akan memastikan kuota dan masa aktif
-              sebelum paket dimulai.
+              <Info size={20} /> Tim toko akan memeriksa transfer sebelum saldo
+              ditambahkan.
             </div>
             <button
               className="primary"
               onClick={() => {
-                setModal("order");
-                setService("wash");
+                if (auth.user && auth.verified)
+                  window.location.assign("/profil");
+                else setModal("login");
               }}
             >
-              Coba pesanan kiloan
+              {auth.user && auth.verified
+                ? "Buka membership"
+                : "Masuk untuk daftar"}
             </button>
           </div>
         )}
         {modal === "detail" && selected && (
-          <OrderDetail
+          <StaffOrderDetail
             order={store.orders.find((o) => o.id === selected.id) || selected}
             services={store.services}
             busy={busy}
@@ -1532,6 +1589,7 @@ function OrderForm({
   busy: boolean;
   submit: (data: unknown) => Promise<void>;
 }) {
+  const auth = useAuth();
   const [step, setStep] = useState(1);
   const [requestId] = useState(() => crypto.randomUUID());
   const [service, setService] = useState(initialService);
@@ -1542,6 +1600,12 @@ function OrderForm({
         1,
   );
   const [speed, setSpeed] = useState<ServiceSpeed>("regular");
+  const [insurance, setInsurance] = useState(false);
+  const [posMemberCode, setPosMemberCode] = useState("");
+  const [memberActive, setMemberActive] = useState(false);
+  const [posPayment, setPosPayment] = useState<"later" | "cash" | "transfer">(
+    "later",
+  );
   const [lat, setLat] = useState(initialLocation.latitude);
   const [lng, setLng] = useState(initialLocation.longitude);
   const pickupLocationEdited = useRef(false);
@@ -1560,6 +1624,21 @@ function OrderForm({
     setForm((p) => ({ ...p, [key]: value }));
   const selectedService =
     services.find((item) => item.id === service) || services[0];
+  useEffect(() => {
+    if (pos || !auth.user) return;
+    let current = true;
+    auth
+      .request("/api/membership")
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = await response.json();
+        if (current) setMemberActive(data.discountEligible === true);
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  }, [pos, auth.user?.uid, auth.request]);
   const selectService = (id: string) => {
     setService(id);
     const next = services.find((item) => item.id === id);
@@ -1617,6 +1696,18 @@ function OrderForm({
             lng,
             photo,
             source: pos ? "pos" : "web",
+            insurance,
+            ...(pos
+              ? {
+                  posPayment,
+                  ...(posMemberCode ? { membershipCode: posMemberCode } : {}),
+                  expectedTotal:
+                    Math.round(
+                      estimate(services, service, kg, speed) *
+                        (posMemberCode.length === 10 ? 0.8 : 1),
+                    ) + (insurance ? 1000 : 0),
+                }
+              : {}),
             requestId,
           });
         } catch (e) {
@@ -1862,6 +1953,21 @@ function OrderForm({
               <Clock size={15} /> Waktu standar: {selectedService.days}
             </p>
           )}
+          <label className="insurance-choice">
+            <input
+              type="checkbox"
+              checked={insurance}
+              onChange={(event) => setInsurance(event.target.checked)}
+            />
+            <span>
+              <b>Perlindungan cucian · Rp1.000</b>
+              <small>
+                Untuk kehilangan, kerusakan, atau warna luntur ke pakaian putih.
+                Kompensasi berdasarkan harga pakaian setelah depresiasi sesuai
+                penilaian toko; syarat selengkapnya ditetapkan lebih lanjut.
+              </small>
+            </span>
+          </label>
           {!pos && (
             <label className="upload">
               {photo ? (
@@ -1927,6 +2033,65 @@ function OrderForm({
               />
             </label>
           </div>
+          {pos && (
+            <label>
+              Kode member (opsional)
+              <input
+                value={posMemberCode}
+                onChange={(event) =>
+                  setPosMemberCode(
+                    event.target.value
+                      .toUpperCase()
+                      .replace(/[^A-F0-9]/g, "")
+                      .slice(0, 10),
+                  )
+                }
+                minLength={10}
+                maxLength={10}
+                placeholder="10 karakter dari profil pelanggan"
+                autoComplete="off"
+              />
+              <small>
+                Minta pelanggan membuat kode untuk cabang ini di profil. Kode
+                berlaku sekali selama 5 menit; saldo hanya digunakan oleh
+                pelanggan melalui tracking. Diskon berlaku jika saldo masih
+                tersedia saat pesanan disimpan.
+              </small>
+            </label>
+          )}
+          {pos && (
+            <fieldset className="pos-payment-choice">
+              <legend>Pembayaran</legend>
+              {(
+                [
+                  ["later", "Bayar nanti", "Pesanan dicatat belum dibayar"],
+                  ["cash", "Tunai diterima", "Tandai lunas saat disimpan"],
+                  [
+                    "transfer",
+                    "Transfer sekarang",
+                    "Periksa transfer setelah pesanan dibuat",
+                  ],
+                ] as const
+              ).map(([value, title, description]) => (
+                <label
+                  key={value}
+                  className={posPayment === value ? "selected" : ""}
+                >
+                  <input
+                    type="radio"
+                    name="posPayment"
+                    value={value}
+                    checked={posPayment === value}
+                    onChange={() => setPosPayment(value)}
+                  />
+                  <span>
+                    <b>{title}</b>
+                    <small>{description}</small>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          )}
           {!pos && (
             <>
               <label>Titik penjemputan</label>
@@ -2012,13 +2177,28 @@ function OrderForm({
           </small>
           <strong>
             {money(
-              pos && kg === 0 ? 0 : estimate(services, service, kg, speed),
+              pos && kg === 0
+                ? 0
+                : Math.round(
+                    estimate(services, service, kg, speed) *
+                      (memberActive || (pos && posMemberCode.length === 10)
+                        ? 0.8
+                        : 1),
+                  ) + (insurance ? 1000 : 0),
             )}
           </strong>
           <small>
             {kg} {selectedService.unit} ·{" "}
             {pos ? "berat/jumlah aktual" : "belum termasuk ongkir"}
           </small>
+          {(memberActive || (pos && posMemberCode.length === 10)) && (
+            <small>
+              Diskon membership 20% pada layanan
+              {pos
+                ? " · kode dan saldo diperiksa saat disimpan"
+                : " · saldo diperiksa saat pesanan dibuat"}
+            </small>
+          )}
         </div>
         <div>
           {step === 2 && (
@@ -2044,189 +2224,6 @@ function OrderForm({
     </form>
   );
 }
-function OrderDetail({
-  order: o,
-  services,
-  busy,
-  save,
-  paymentEnabled,
-  onPaymentChanged,
-}: {
-  order: Order;
-  services: Service[];
-  busy: boolean;
-  save: (data: unknown) => Promise<void>;
-  paymentEnabled?: boolean;
-  onPaymentChanged: () => void;
-}) {
-  const [err, setErr] = useState("");
-  const selectedService = services.find((service) => service.id === o.service);
-  const orderUnit = unitLabel(o.unit ?? selectedService?.unit);
-  const quantityStep = orderUnit === "kg" ? "0.1" : "1";
-  const gatewayLocked = Boolean(
-    o.paid ||
-    o.paymentReconciliationRequired ||
-    (o.payment && ["creating", "pending", "paid"].includes(o.payment.status)) ||
-    (o.manualPayment &&
-      ["awaiting_review", "paid"].includes(o.manualPayment.status)),
-  );
-  return (
-    <form
-      onSubmit={async (e) => {
-        e.preventDefault();
-        const f = new FormData(e.currentTarget);
-        try {
-          await save({
-            id: o.id,
-            status: Number(f.get("status")),
-            actualKg: Number(f.get("weight")),
-            paid: o.paid,
-            shippingFee:
-              f.get("shipping") === "" ? null : Number(f.get("shipping")),
-          });
-          setErr("");
-        } catch (e) {
-          setErr((e as Error).message);
-        }
-      }}
-    >
-      <p className="eyebrow">
-        {o.id} · {o.source === "pos" ? "WALK-IN" : "ONLINE"}
-      </p>
-      <h2>{o.name}</h2>
-      <p className="muted">
-        {o.phone} · {services.find((s) => s.id === o.service)?.name}
-      </p>
-      <div className="detail-address">
-        <MapPin size={18} />
-        <div>
-          {o.address}
-          <small>
-            {o.date} · {o.slot}
-          </small>
-          {o.source === "web" && (
-            <a
-              target="_blank"
-              rel="noreferrer"
-              href={`https://www.google.com/maps?q=${o.lat},${o.lng}`}
-            >
-              Buka titik jemput
-            </a>
-          )}
-        </div>
-      </div>
-      {o.notes && (
-        <div className="notice">
-          <Info size={18} />
-          {o.notes}
-        </div>
-      )}
-      {o.photo && <AuthorizedPhoto src={o.photo} />}
-      <div className="form-two">
-        <label>
-          {orderUnit === "kg"
-            ? "Berat aktual (kg)"
-            : `Jumlah aktual (${orderUnit})`}
-          <input
-            required
-            name="weight"
-            type="number"
-            step={quantityStep}
-            min={orderUnit === "kg" ? "0.1" : "1"}
-            max="100"
-            defaultValue={o.actualKg ?? o.kg}
-            readOnly={gatewayLocked}
-            aria-readonly={gatewayLocked}
-          />
-          {o.actualKg === null && (
-            <small className="!text-amber-700">
-              {o.kg} {orderUnit} masih perkiraan. Pastikan jumlah aktual lalu
-              simpan.
-            </small>
-          )}
-        </label>
-        <label>
-          Status
-          <select name="status" defaultValue={o.status}>
-            {statuses.map((s, i) => (
-              <option disabled={i < o.status} value={i} key={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <label>
-        Ongkir (Rp)
-        <input
-          name="shipping"
-          type="number"
-          min="0"
-          max="10000000"
-          step="1000"
-          placeholder="Belum dikonfirmasi"
-          defaultValue={o.shippingFee ?? ""}
-          readOnly={gatewayLocked}
-          aria-readonly={gatewayLocked}
-        />
-        <small>Isi 0 jika gratis atau pelanggan ambil di toko.</small>
-      </label>
-      <div className="my-4">
-        <PaymentStatus
-          paid={o.paid}
-          manualPayment={o.manualPayment}
-          payment={o.payment}
-          reviewRequired={o.paymentReconciliationRequired}
-          compact={false}
-        />
-      </div>
-      {gatewayLocked && (
-        <p className="notice text-sm" role="status">
-          <ShieldCheck size={18} aria-hidden="true" />
-          {o.paid
-            ? "Tagihan sudah lunas dan tidak dapat diubah."
-            : o.manualPayment?.status === "awaiting_review"
-              ? "Bukti transfer sudah diajukan. Periksa pembayaran sebelum mengubah tagihan."
-              : "Tagihan dikunci selama QRIS aktif. Batalkan QR sebelum mengubah berat atau ongkir."}
-        </p>
-      )}
-      <div className="total-line">
-        <span>Total tagihan saat ini</span>
-        <b>{money(o.total)}</b>
-      </div>
-      <p className="muted">
-        Total dihitung ulang dari berat aktual dan ongkir saat disimpan.
-      </p>
-      {err && (
-        <p className="form-error" role="alert">
-          {err}
-        </p>
-      )}
-      <button disabled={busy} className="primary full">
-        {busy ? "Menyimpan…" : "Simpan perubahan"}
-      </button>
-      <div className="my-5 text-left">
-        <PaymentPanel
-          orderId={o.id}
-          trackingToken={o.token}
-          enabled={paymentEnabled}
-          initialPaid={o.paid}
-          initialPayment={o.payment}
-          initialReviewRequired={o.paymentReconciliationRequired}
-          initialManualPayment={o.manualPayment}
-          onChanged={onPaymentChanged}
-        />
-      </div>
-      <a
-        className="text-button full"
-        href={`/?track=${o.token}`}
-        target="_blank"
-      >
-        Buka tracking pelanggan
-      </a>
-    </form>
-  );
-}
 function PriceEditor({
   store,
   save,
@@ -2244,6 +2241,8 @@ function PriceEditor({
         setBusy(true);
         const f = new FormData(e.currentTarget);
         const data = store.services.map((service) => {
+          if (service.category === "member")
+            return { id: service.id, price: service.price };
           if (!service.rates)
             return { id: service.id, price: Number(f.get(service.id)) };
           const rates = Object.fromEntries(
@@ -2283,6 +2282,7 @@ function PriceEditor({
       </p>
       <div className="price-editor-catalog">
         {serviceCategoryOrder.map((category) => {
+          if (category === "member") return null;
           const group = store.services.filter(
             (service) => service.category === category,
           );

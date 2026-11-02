@@ -2,6 +2,7 @@ import "server-only";
 import type { NextRequest } from "next/server";
 import { adminAuth, firebaseReady, db } from "./admin";
 import { resolveAccess, type AccessRole } from "../access-policy";
+import { isPhoneLogin } from "../phone-auth";
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -32,9 +33,14 @@ export async function identity(
   try {
     if (!header.startsWith("Bearer ")) throw Error();
     const token = await adminAuth().verifyIdToken(header.slice(7), true);
+    const provider = token.firebase.sign_in_provider;
+    const adminSurface = req.headers.get("x-dfable-surface") === "admin";
+    const phoneLogin =
+      !adminSurface &&
+      isPhoneLogin(token.email, provider, token.dfable_phone_account);
     if (
-      !token.email_verified ||
-      !["google.com", "password"].includes(token.firebase.sign_in_provider)
+      (!token.email_verified && !phoneLogin) ||
+      !["google.com", "password"].includes(provider)
     )
       throw Error();
     const email = (token.email || "").toLowerCase();
@@ -43,14 +49,13 @@ export async function identity(
     const resolved = resolveAccess(
       email,
       !!token.email_verified,
-      token.firebase.sign_in_provider,
+      provider,
       access.get("role"),
       process.env.ADMIN_EMAILS || "",
     );
-    const adminSurface = req.headers.get("x-dfable-surface") === "admin";
     return {
       uid: token.uid,
-      email,
+      email: phoneLogin ? "" : email,
       name: token.name || "",
       admin: resolved.dashboard && adminSurface,
       manageUsers: resolved.manageUsers && adminSurface,

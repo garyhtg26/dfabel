@@ -26,6 +26,13 @@ import { serverFailure } from "@/lib/server-diagnostics";
 import { paymentLocked } from "@/lib/payments/policy";
 import { manualLocked } from "@/lib/payments/manual-policy";
 import { signalPaymentChange } from "@/lib/payments/service";
+import {
+  memberCodeHash,
+  validMemberCode,
+  validMemberWallet,
+} from "@/lib/membership-code";
+import { prepareEarn, commitEarn } from "@/lib/loyalty";
+import { eligibleMemberDiscount } from "@/lib/membership-eligibility";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -76,6 +83,13 @@ export async function POST(req: NextRequest) {
     if (body.action === "order") {
       const input = orderSchema.parse(body.data);
       if (input.source === "pos") requireAdmin(user);
+      if (
+        input.source !== "pos" &&
+        (input.posPayment ||
+          input.expectedTotal !== undefined ||
+          input.membershipCode)
+      )
+        throw new ApiError(400, "Pilihan pembayaran kasir tidak tersedia.");
       const today = new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Jakarta",
       }).format(new Date());
@@ -92,6 +106,22 @@ export async function POST(req: NextRequest) {
           throw new ApiError(409, "Konflik nomor pesanan.");
         return NextResponse.json({ store: await readStore(user, branch), id });
       }
+      if (input.membershipCode) {
+        await database.runTransaction(async (tx) => {
+          const attemptRef = database.doc(`membershipCodeAttempts/${user.uid}`);
+          const attemptSnap = await tx.get(attemptRef);
+          const now = Date.now();
+          const attempts = (attemptSnap.get("attempts") || []).filter(
+            (value: number) => Number.isFinite(value) && value > now - 3600000,
+          );
+          if (attempts.length >= 30)
+            throw new ApiError(
+              429,
+              "Terlalu banyak percobaan kode member. Coba lagi nanti.",
+            );
+          tx.set(attemptRef, { attempts: [...attempts, now] });
+        });
+      }
       let photoPath = "";
       if (input.photo) {
         if (!photoStorageReady())
@@ -106,12 +136,38 @@ export async function POST(req: NextRequest) {
         await uploadPhoto(photoPath, bytes);
       }
       await database.runTransaction(async (tx) => {
-        const [settings, prior, rate] = await Promise.all([
+        const codeHash = input.membershipCode
+          ? memberCodeHash(input.membershipCode)
+          : null;
+        const codeRef = codeHash
+          ? database.doc(`membershipCodes/${codeHash}`)
+          : null;
+        const [settings, prior, rate, codeSnap] = await Promise.all([
           tx.get(database.doc(`settings/${branch}`)),
           tx.get(ref),
           tx.get(database.doc(`rateLimits/${user.uid}`)),
+          codeRef ? tx.get(codeRef) : Promise.resolve(null),
         ]);
         if (prior.exists) return;
+        let customerUid: string | null =
+          input.source === "web" ? user.uid : null;
+        if (codeRef) {
+          const codeData = codeSnap?.data();
+          if (!validMemberCode(codeData, branch, Date.now()))
+            throw new ApiError(
+              409,
+              "Kode member tidak berlaku, kedaluwarsa, atau sudah digunakan. Minta kode baru untuk cabang ini.",
+            );
+          customerUid = codeData!.uid as string;
+        }
+        const membership = customerUid
+          ? await tx.get(database.doc(`memberships/${customerUid}`))
+          : null;
+        if (codeRef && !validMemberWallet(membership?.data(), codeHash!))
+          throw new ApiError(
+            409,
+            "Kode member tidak berlaku atau saldo sudah habis. Minta pelanggan memeriksa saldo dan membuat kode baru.",
+          );
         const cutoff = Date.now() - 3600000;
         const attempts = (rate.get("orders") || []).filter(
           (t: number) => t > cutoff,
@@ -139,37 +195,53 @@ export async function POST(req: NextRequest) {
         const washService = services.find((item) => item.id === "wash")!;
         const washPrice = serviceUnitRate(washService);
         const now = new Date().toISOString();
-        const { requestId, photo, ...cleanInput } = input;
+        const {
+          requestId,
+          photo,
+          expectedTotal,
+          membershipCode,
+          ...cleanInput
+        } = input;
         void requestId;
         void photo;
+        void membershipCode;
         const clean = {
           ...cleanInput,
+          membershipDiscount: eligibleMemberDiscount(membership?.data()),
           express: speed !== "regular",
           unit: service.unit,
           speed,
           pricingVersion: 2 as const,
           minimumQuantity: service.minimumQuantity || 1,
         };
+        const calculatedTotal =
+          calculateOrderPrice({ ...clean, unitPrice, washPrice }, input.kg) +
+          (input.insurance ? 1000 : 0);
+        if (
+          input.source === "pos" &&
+          input.posPayment === "cash" &&
+          expectedTotal !== calculatedTotal
+        )
+          throw new ApiError(
+            409,
+            "Harga layanan berubah. Periksa ulang tagihan sebelum menerima tunai.",
+          );
         const status = input.source === "pos" ? 3 : 0;
         const token = randomUUID();
         const order: Order = {
           ...clean,
           id,
           token,
-          uid: input.source === "pos" ? null : user.uid,
+          uid: customerUid,
           branchId: branch,
           actualKg: input.source === "pos" ? input.kg : null,
           status,
-          paid: false,
+          paid: input.source === "pos" && input.posPayment === "cash",
+          ...(input.source === "pos" && input.posPayment === "cash"
+            ? { paymentMethod: "cash" as const, paidAt: now }
+            : {}),
           shippingFee: input.source === "pos" ? 0 : null,
-          total: calculateOrderPrice(
-            {
-              ...clean,
-              unitPrice,
-              washPrice,
-            },
-            input.kg,
-          ),
+          total: calculatedTotal,
           unitPrice,
           washPrice,
           photo: "",
@@ -177,7 +249,10 @@ export async function POST(req: NextRequest) {
           createdAt: now,
           history: [{ status, at: now }],
         };
-        tx.create(ref, { ...order, createdBy: user.uid });
+        const earn = order.paid ? await prepareEarn(tx, database, order) : null;
+        const earnedFields = commitEarn(tx, database, order, earn, now);
+        tx.create(ref, { ...order, ...earnedFields, createdBy: user.uid });
+        if (codeRef) tx.delete(codeRef);
         tx.create(database.doc(`tracking/${token}`), { orderId: id });
         tx.set(database.doc(`rateLimits/${user.uid}`), {
           orders: [...attempts, Date.now()],
@@ -222,13 +297,23 @@ export async function POST(req: NextRequest) {
           throw new ApiError(400, "Konfirmasi ongkir sebelum menandai lunas.");
         if (o.unit && o.unit !== "kg" && !Number.isInteger(v.actualKg))
           throw new ApiError(400, "Jumlah aktual item harus bilangan bulat.");
-        const serviceTotal = calculateOrderPrice(o, v.actualKg);
-        if ((o.pointsUsed || 0) > serviceTotal)
+        if ((o.membershipUsed || 0) > 0 && v.actualKg !== o.actualKg)
           throw new ApiError(
             409,
-            "Poin yang digunakan melebihi harga layanan. Minta pelanggan mengurangi poin terlebih dahulu.",
+            "Jumlah tidak dapat diubah setelah saldo membership digunakan.",
           );
-        const total = serviceTotal - (o.pointsUsed || 0) + (v.shippingFee ?? 0);
+        const serviceTotal = calculateOrderPrice(o, v.actualKg);
+        if ((o.pointsUsed || 0) + (o.membershipUsed || 0) > serviceTotal)
+          throw new ApiError(
+            409,
+            "Poin dan saldo membership yang digunakan melebihi harga layanan. Minta pelanggan mengurangi penggunaannya terlebih dahulu.",
+          );
+        const total =
+          serviceTotal -
+          (o.pointsUsed || 0) -
+          (o.membershipUsed || 0) +
+          (o.insurance ? 1000 : 0) +
+          (v.shippingFee ?? 0);
         if (total === 0 && !o.paid)
           throw new ApiError(
             409,

@@ -12,7 +12,11 @@ import {
   type BranchId,
 } from "@/lib/branches";
 
-function Header() {
+export function CustomerHeader({
+  active = "about",
+}: {
+  active?: "about" | "profile";
+}) {
   const [branch, setBranch] = useState<BranchId>("cinere");
   const [open, setOpen] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -72,7 +76,7 @@ function Header() {
           <Link href={page("home")}>Beranda</Link>
           <Link href={page("services")}>Layanan & harga</Link>
           <Link href={page("tracking")}>Lacak pesanan</Link>
-          <Link className="active" href="/tentang">
+          <Link className={active === "about" ? "active" : ""} href="/tentang">
             Tentang D’Fable
           </Link>
         </nav>
@@ -127,7 +131,7 @@ function Header() {
 export default function AboutHeader() {
   return (
     <AuthProvider scope="customer">
-      <Header />
+      <CustomerHeader />
     </AuthProvider>
   );
 }

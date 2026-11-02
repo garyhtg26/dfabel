@@ -39,6 +39,9 @@ export type Order = {
   photoPath?: string;
   status: number;
   paid: boolean;
+  paidAt?: string;
+  paymentMethod?: "cash" | "points" | "membership";
+  posPayment?: "later" | "cash" | "transfer";
   payment?: import("./payments/types").PaymentSummary;
   paymentReconciliationRequired?: boolean;
   manualPayment?: import("./payments/manual-types").ManualPaymentSummary;
@@ -47,6 +50,9 @@ export type Order = {
   total: number;
   pointsUsed?: number;
   pointsEarned?: number;
+  insurance?: boolean;
+  membershipDiscount?: boolean;
+  membershipUsed?: number;
   unitPrice: number;
   washPrice: number;
   source: "web" | "pos";
@@ -95,12 +101,15 @@ export type TrackingOrder = Pick<
   | "total"
   | "pointsUsed"
   | "pointsEarned"
+  | "insurance"
+  | "membershipDiscount"
+  | "membershipUsed"
   | "shippingFee"
   | "date"
   | "slot"
   | "history"
   | "createdAt"
->;
+> & { source?: Order["source"] };
 export const statuses = [
   "Menunggu konfirmasi",
   "Dijadwalkan jemput",

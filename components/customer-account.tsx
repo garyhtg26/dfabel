@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, LogOut, User } from "lucide-react";
 import { useAuth } from "./auth-provider";
+import { phoneFromLoginEmail } from "@/lib/phone-auth";
 import "./customer-account.css";
 
 export default function CustomerAccount({ onLogin }: { onLogin: () => void }) {
@@ -56,7 +57,9 @@ export default function CustomerAccount({ onLogin }: { onLogin: () => void }) {
         <div className="customer-account-menu">
           <div className="customer-account-name">
             <strong>{auth.name || "Akun saya"}</strong>
-            <small>{auth.user?.email}</small>
+            <small>
+              {phoneFromLoginEmail(auth.user?.email) || auth.user?.email}
+            </small>
           </div>
           <Link href="/profil" onClick={() => setOpen(false)}>
             <User size={17} /> Profil saya

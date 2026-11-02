@@ -5,6 +5,12 @@ export function authErrorMessage(error: unknown, hostname = ""): string {
       return "Metode login ini belum diaktifkan di Firebase Authentication.";
     case "auth/email-already-in-use":
       return "Email sudah terdaftar. Silakan masuk atau atur ulang password.";
+    case "auth/phone-already-exists":
+      return "Nomor ini sudah terdaftar. Silakan masuk atau hubungi toko.";
+    case "auth/invalid-phone-number":
+      return "Masukkan nomor WhatsApp Indonesia yang valid.";
+    case "auth/phone-register-failed":
+      return "Pendaftaran belum berhasil. Coba lagi nanti.";
     case "auth/unauthorized-domain":
       return hostname
         ? `Login Google belum diizinkan dari ${hostname}. Tambahkan domain ini di Firebase Authentication → Settings → Authorized domains.`

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Plus, ShieldCheck, User, Trash2, Save } from "lucide-react";
 import { useAuth } from "./auth-provider";
+import MembershipAdmin from "./membership-admin";
 type Row = {
   uid: string;
   email: string;
@@ -13,6 +14,7 @@ type Row = {
   verified: boolean;
   self: boolean;
   providers: string[];
+  phoneAccount?: boolean;
 };
 export default function UserManagement() {
   const auth = useAuth();
@@ -66,6 +68,7 @@ export default function UserManagement() {
   }
   return (
     <section className="user-management">
+      <MembershipAdmin />
       <div className="users-toolbar">
         <div>
           <h2>Tim & pelanggan</h2>
@@ -156,7 +159,7 @@ export default function UserManagement() {
       {pending && (
         <div className="delete-confirm" role="alert">
           <div>
-            <b>Hapus akun {pending.email}?</b>
+            <b>Hapus akun {pending.email || pending.phone || pending.name}?</b>
             <p>
               Akun ini akan dihapus permanen. Riwayat transaksi tetap tersimpan.
             </p>
@@ -246,7 +249,7 @@ function UserRow({
           {row.name || "Tanpa nama"}
           {row.self ? " · kamu" : ""}
         </b>
-        <span>{row.email}</span>
+        {row.email && <span>{row.email}</span>}
         <span>WhatsApp: {row.phone || "Belum diisi"}</span>
         {row.createdAt && !Number.isNaN(Date.parse(row.createdAt)) && (
           <small>
@@ -254,8 +257,12 @@ function UserRow({
           </small>
         )}
         <small>
-          {row.verified ? "Email terverifikasi" : "Email belum diverifikasi"} ·{" "}
-          {row.disabled ? "Nonaktif" : "Aktif"}
+          {row.phoneAccount
+            ? "Nomor belum diverifikasi"
+            : row.verified
+              ? "Email terverifikasi"
+              : "Email belum diverifikasi"}{" "}
+          · {row.disabled ? "Nonaktif" : "Aktif"}
         </small>
       </div>
       <div className="user-row-controls">
@@ -268,8 +275,12 @@ function UserRow({
           >
             {row.role === "owner" && <option value="owner">Pemilik</option>}
             <option value="customer">Pelanggan</option>
-            <option value="staff">Staf</option>
-            <option value="admin">Admin</option>
+            <option value="staff" disabled={row.phoneAccount}>
+              Staf
+            </option>
+            <option value="admin" disabled={row.phoneAccount}>
+              Admin
+            </option>
           </select>
         </label>
         <label className="user-disabled">

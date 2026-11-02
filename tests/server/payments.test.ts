@@ -231,6 +231,8 @@ test("a provider transaction is bound to exact invoice, amount, transaction, mer
 test("only confirmed server totals can produce a QR and expiry alone never unlocks an active invoice", () => {
   const order = baseOrder();
   assert.equal(finalAmount(order), 20000);
+  assert.equal(finalAmount({ ...order, insurance: true, total: 21000 }), 21000);
+  assert.equal(finalAmount({ ...order, insurance: true }), null);
   assert.equal(finalAmount({ ...order, actualKg: null }), null);
   assert.equal(finalAmount({ ...order, shippingFee: null }), null);
   assert.equal(finalAmount({ ...order, total: 1 }), null);

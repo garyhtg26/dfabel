@@ -111,13 +111,13 @@ const additional: Service[] = [
 
 const member: Service = {
   id: "member",
-  name: "D’Fable Monthly",
-  description: "Paket bulanan 30 kg, berlaku 30 hari.",
+  name: "Membership D’Fable",
+  description: "Deposit mulai Rp100.000; diskon layanan 20% saat saldo tersedia.",
   category: "member",
-  price: 150000,
-  unit: "bulan",
+  price: 100000,
+  unit: "deposit",
   minimumQuantity: 1,
-  days: "30 hari",
+  days: "Sesuai ketentuan membership",
   icon: "member",
 };
 

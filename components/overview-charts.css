@@ -1,0 +1,151 @@
+.overview-charts {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 20px;
+  margin: 0 0 24px;
+}
+.overview-chart-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.overview-chart-heading h3,
+.overview-service-time h3 {
+  margin: 0 0 5px;
+}
+.overview-chart-heading p,
+.overview-service-time > p {
+  color: #8b91a1;
+  font-size: 12px;
+  margin: 0;
+}
+.overview-chart-heading strong {
+  color: #2924ca;
+  font-size: 18px;
+  white-space: nowrap;
+}
+.overview-line-chart {
+  min-width: 0;
+  margin-top: 20px;
+}
+.overview-line-chart svg {
+  display: block;
+  width: 100%;
+  height: 165px;
+  overflow: visible;
+}
+.overview-line-grid {
+  stroke: #e9ebf3;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.overview-line-path {
+  fill: none;
+  stroke: #4038e8;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.overview-line-area {
+  fill: #615bf0;
+  opacity: 0.09;
+}
+.overview-line-point {
+  fill: #fff;
+  stroke: #4038e8;
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
+.overview-line-labels {
+  display: flex;
+  justify-content: space-between;
+  margin: 5px 0 0;
+}
+.overview-line-labels button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #858b9b;
+  font-size: 10px;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.overview-line-labels button:hover,
+.overview-line-labels button.is-selected {
+  background: #eeedff;
+  color: #3831c7;
+}
+.overview-line-labels button:focus-visible {
+  outline: 2px solid #4038e8;
+  outline-offset: 1px;
+}
+.overview-line-point.is-selected {
+  fill: #4038e8;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.overview-line-selection {
+  margin: 6px 0 0;
+  color: #858b9b;
+  font-size: 11px;
+  text-align: right;
+}
+.overview-line-selection b {
+  margin-left: 6px;
+  color: #2924ca;
+  font-size: 12px;
+}
+.overview-line-response .overview-line-path,
+.overview-line-response .overview-line-point {
+  stroke: #7770eb;
+}
+.overview-line-response svg {
+  height: 95px;
+}
+.overview-response-chart .overview-line-chart {
+  margin-top: 8px;
+}
+.overview-service-time > div {
+  display: grid;
+  gap: 4px;
+  padding: 15px 0;
+  border-bottom: 1px solid #eef0f5;
+}
+.overview-service-time > div span,
+.overview-service-time > div small {
+  color: #858b9b;
+  font-size: 11px;
+}
+.overview-service-time > div strong {
+  color: #242a40;
+  font-size: 21px;
+}
+.overview-chart-note {
+  margin: 12px 0 0 !important;
+  color: #8b91a1;
+  font-size: 11px !important;
+  line-height: 1.5;
+}
+@media (max-width: 1000px) {
+  .overview-charts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 520px) {
+  .overview-charts {
+    gap: 12px;
+  }
+  .overview-chart-heading {
+    flex-wrap: wrap;
+  }
+  .overview-line-labels button {
+    font-size: 9px;
+  }
+}

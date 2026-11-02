@@ -1,0 +1,176 @@
+.membership-review {
+  margin-bottom: 24px;
+}
+.membership-review-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+}
+.membership-review-title h2 {
+  margin: 5px 0 4px;
+  font-size: 20px;
+}
+.membership-review-title p {
+  color: #778198;
+  font-size: 13px;
+  margin: 0;
+}
+.membership-review-kicker {
+  color: #3829dc;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+.membership-review-refresh {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  background: #fff;
+  border: 1px solid #e3e7f0;
+  border-radius: 10px;
+  color: #526079;
+  flex: none;
+}
+.membership-review-refresh:disabled {
+  opacity: 0.5;
+}
+.membership-review-count {
+  margin: 22px 0 10px;
+  color: #778198;
+  font-size: 12px;
+  font-weight: 600;
+}
+.membership-review-empty {
+  margin: 20px 0 0;
+  padding: 18px;
+  border-radius: 12px;
+  background: #f7f8fc;
+  font-size: 13px;
+  color: #6b758a;
+}
+.membership-review-message,
+.membership-review-error {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.membership-review-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #edfaf3;
+  color: #17764a;
+}
+.membership-review-error {
+  background: #fff1f1;
+  color: #b32c35;
+}
+.membership-review-item {
+  border: 1px solid #e5e9f1;
+  border-radius: 14px;
+  padding: 18px;
+  margin-top: 10px;
+}
+.membership-review-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.membership-review-head h3 {
+  font-size: 15px;
+  margin: 9px 0 3px;
+}
+.membership-review-head p {
+  color: #68758a;
+  font-size: 12px;
+  margin: 0;
+}
+.membership-review-head > strong {
+  font-size: 18px;
+  white-space: nowrap;
+}
+.membership-review-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fff4d9;
+  color: #956100;
+  border-radius: 99px;
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.membership-review-meta {
+  display: flex;
+  gap: 8px 15px;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  color: #7b8497;
+  font-size: 12px;
+}
+.membership-review-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.membership-review-actions .secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.membership-review-no-proof {
+  color: #9b6a15;
+  font-size: 12px;
+}
+.membership-review-proof {
+  margin-top: 14px;
+  padding: 12px;
+  background: #f6f7fa;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #69748a;
+}
+.membership-review-proof img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 360px;
+  margin: auto;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.membership-review-confirm {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #fff8e8;
+  color: #6e5317;
+  font-size: 13px;
+}
+.membership-review-confirm p {
+  margin: 6px 0 12px;
+  line-height: 1.45;
+}
+.membership-review-confirm > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+@media (max-width: 520px) {
+  .membership-review-item {
+    padding: 14px;
+  }
+  .membership-review-head > strong {
+    font-size: 15px;
+  }
+  .membership-review-actions .secondary {
+    flex: 1;
+  }
+}

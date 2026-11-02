@@ -34,7 +34,7 @@ const categories = [
   { id: "wash", label: "Cuci kering", icon: WashingMachine },
   { id: "iron", label: "Setrika", icon: Wind },
   { id: "complete", label: "Lengkap", icon: Shirt },
-  { id: "member", label: "Bulanan", icon: Layers },
+  { id: "member", label: "Membership", icon: Layers },
 ];
 
 export default function CustomerHome({
@@ -58,7 +58,6 @@ export default function CustomerHome({
         ["wash", "complete", "iron"].indexOf(b.id),
     )
     .filter((service) => category === "all" || service.id === category);
-  const member = store.services.find((s) => s.id === "member")!;
   const promoImage = siteImage(content, "promo");
   const peopleImage = siteImage(content, "people");
   const memberImage = siteImage(content, "member");
@@ -146,6 +145,7 @@ export default function CustomerHome({
             .filter((c) => c.id !== "member" || content.member.active)
             .map(({ id, label, icon: Icon }) => (
               <button
+                type="button"
                 aria-pressed={category === id}
                 key={id}
                 className={category === id ? "selected" : ""}
@@ -228,9 +228,9 @@ export default function CustomerHome({
                   sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
                   unoptimized={!memberImage.startsWith("/api/")}
                   src={memberImage}
-                  alt="Paket bulanan"
+                  alt="Membership D’Fable"
                 />
-                <span className="photo-service-tag">Paket bulanan</span>
+                <span className="photo-service-tag">Membership</span>
                 <span className="photo-service-add">
                   <Plus size={20} />
                 </span>
@@ -238,15 +238,15 @@ export default function CustomerHome({
               <div className="photo-service-info">
                 <h3>{content.member.title}</h3>
                 <div>
-                  <strong>{money(member.price)}</strong>
-                  <small> / bulan</small>
+                  <strong>Mulai {money(100000)}</strong>
+                  <small> deposit</small>
                 </div>
                 <p>
                   <Layers size={14} />
-                  30 kg
+                  Diskon 20% saat saldo tersedia
                   <span />
                   <Clock size={14} />
-                  30 hari
+                  Saldo untuk laundry
                 </p>
               </div>
             </button>
@@ -296,10 +296,10 @@ export default function CustomerHome({
               unoptimized={!memberImage.startsWith("/api/")}
               className="monthly-thumb"
               src={memberImage}
-              alt="Paket bulanan"
+              alt="Membership D’Fable"
             />
             <div className="monthly-copy">
-              <span className="monthly-kicker">D’FABLE MONTHLY</span>
+              <span className="monthly-kicker">D’FABLE MEMBERSHIP</span>
               <h3>{content.member.title}</h3>
             </div>
             <span className="monthly-action">

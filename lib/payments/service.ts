@@ -173,11 +173,22 @@ export async function applyVerifiedTransaction(
       (order.pointsEarned || order.pointsUsed)
         ? database.doc(`loyalty/${order.uid}`)
         : null;
+    const membershipReviewRef =
+      order?.uid && financialException(transaction) && order.membershipUsed
+        ? database.doc(`memberships/${order.uid}`)
+        : null;
     if (loyaltyReviewRef) await tx.get(loyaltyReviewRef);
+    if (membershipReviewRef) await tx.get(membershipReviewRef);
     tx.set(attemptRef, updated);
     if (loyaltyReviewRef)
       tx.set(
         loyaltyReviewRef,
+        { reconciliationRequired: true, updatedAt: now },
+        { merge: true },
+      );
+    if (membershipReviewRef)
+      tx.set(
+        membershipReviewRef,
         { reconciliationRequired: true, updatedAt: now },
         { merge: true },
       );

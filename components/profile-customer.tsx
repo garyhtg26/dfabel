@@ -3,18 +3,29 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft,
   ArrowDownLeft,
   ArrowUpRight,
   Gift,
+  LayoutDashboard,
   LockKeyhole,
+  Package,
+  Shirt,
+  Store,
+  User,
   UserRound,
 } from "lucide-react";
 import { useAuth } from "./auth-provider";
-import CustomerAccount from "./customer-account";
+import { CustomerHeader } from "./about-header";
+import MembershipCard from "./membership-card";
 import "./profile-customer.css";
 
-type Profile = { name: string; phone: string; email: string };
+type Profile = {
+  name: string;
+  phone: string;
+  email: string;
+  loginPhone?: string;
+  phoneVerified?: boolean;
+};
 type PointEntry = {
   id: string;
   type: "earned" | "redeemed" | "returned";
@@ -140,6 +151,10 @@ export default function CustomerProfile() {
   )
     return (
       <main className="loading">
+        <Link className="brand" href="/" aria-label="D’Fable beranda">
+          <img src="/dfable-logo.png" alt="D’Fable Laundry Studio" />
+        </Link>
+        <p role="status">Menyiapkan profil…</p>
         <div
           className="loading-progress"
           role="progressbar"
@@ -174,15 +189,7 @@ export default function CustomerProfile() {
 
   return (
     <main className="profile-page">
-      <header className="profile-header">
-        <Link href="/" className="profile-brand" aria-label="D’Fable beranda">
-          <img src="/dfable-logo.png" alt="D’Fable Laundry Studio" />
-        </Link>
-        <Link className="profile-back" href="/">
-          <ArrowLeft size={17} /> <span>Kembali ke beranda</span>
-        </Link>
-        <CustomerAccount onLogin={() => {}} />
-      </header>
+      <CustomerHeader active="profile" />
       <div className="profile-content">
         <div className="profile-title">
           <span>AKUN SAYA</span>
@@ -190,77 +197,99 @@ export default function CustomerProfile() {
           <p>Kelola data diri dan lihat poin yang kamu punya.</p>
         </div>
         <div className="profile-layout">
-          <section className="profile-panel profile-details">
-            <div className="profile-panel-heading">
-              <span className="profile-panel-icon">
-                <UserRound size={22} />
-              </span>
-              <div>
-                <h2>Data diri</h2>
-                <p>Informasi untuk pesananmu.</p>
+          <div className="profile-details-column">
+            <MembershipCard />
+            <section className="profile-panel profile-details">
+              <div className="profile-panel-heading">
+                <span className="profile-panel-icon">
+                  <UserRound size={22} />
+                </span>
+                <div>
+                  <h2>Data diri</h2>
+                  <p>Informasi untuk pesananmu.</p>
+                </div>
               </div>
-            </div>
-            {profile ? (
-              <form onSubmit={save}>
-                <label>
-                  Nama lengkap
-                  <input
-                    required
-                    minLength={2}
-                    maxLength={80}
-                    autoComplete="name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Nomor WhatsApp
-                  <input
-                    type="tel"
-                    autoComplete="tel"
-                    placeholder="Contoh: 0812 3456 7890"
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                  />
-                  <small>Digunakan untuk menghubungi kamu soal pesanan.</small>
-                </label>
-                <label>
-                  Email{" "}
-                  <span className="profile-locked">
-                    <LockKeyhole size={13} /> Tidak dapat diubah
-                  </span>
-                  <input value={profile.email} readOnly autoComplete="email" />
-                </label>
-                {profileError && (
-                  <p className="profile-error" role="alert">
-                    {profileError}
-                  </p>
-                )}
-                {notice && (
-                  <p className="profile-notice" role="status">
-                    {notice}
-                  </p>
-                )}
-                <button className="primary" type="submit" disabled={saving}>
-                  {saving ? "Menyimpan…" : "Simpan perubahan"}
-                </button>
-              </form>
-            ) : profileError ? (
-              <div className="profile-retry">
-                <p role="alert">{profileError}</p>
-                <button
-                  className="secondary"
-                  onClick={() => setReload((value) => value + 1)}
-                >
-                  Coba lagi
-                </button>
-              </div>
-            ) : (
-              <p className="profile-loading" role="status">
-                Memuat data diri…
-              </p>
-            )}
-          </section>
+              {profile ? (
+                <form onSubmit={save}>
+                  <label>
+                    Nama lengkap
+                    <input
+                      required
+                      minLength={2}
+                      maxLength={80}
+                      autoComplete="name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Nomor WhatsApp
+                    <input
+                      type="tel"
+                      autoComplete="tel"
+                      placeholder="Contoh: 0812 3456 7890"
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
+                    />
+                    <small>
+                      Digunakan untuk menghubungi kamu soal pesanan.
+                    </small>
+                  </label>
+                  {profile.loginPhone && (
+                    <label>
+                      Nomor untuk masuk{" "}
+                      <span className="profile-locked">
+                        <LockKeyhole size={13} /> Tidak dapat diubah
+                      </span>
+                      <input type="tel" value={profile.loginPhone} readOnly />
+                      <small>
+                        Nomor akun belum diverifikasi. Nomor kontak pesanan
+                        dapat diubah terpisah.
+                      </small>
+                    </label>
+                  )}
+                  <label>
+                    Email{" "}
+                    <span className="profile-locked">
+                      <LockKeyhole size={13} /> Tidak dapat diubah
+                    </span>
+                    <input
+                      value={profile.email || "Tidak ditambahkan"}
+                      readOnly
+                      autoComplete="email"
+                    />
+                  </label>
+                  {profileError && (
+                    <p className="profile-error" role="alert">
+                      {profileError}
+                    </p>
+                  )}
+                  {notice && (
+                    <p className="profile-notice" role="status">
+                      {notice}
+                    </p>
+                  )}
+                  <button className="primary" type="submit" disabled={saving}>
+                    {saving ? "Menyimpan…" : "Simpan perubahan"}
+                  </button>
+                </form>
+              ) : profileError ? (
+                <div className="profile-retry">
+                  <p role="alert">{profileError}</p>
+                  <button
+                    className="secondary"
+                    onClick={() => setReload((value) => value + 1)}
+                  >
+                    Coba lagi
+                  </button>
+                </div>
+              ) : (
+                <p className="profile-loading" role="status">
+                  Memuat data diri…
+                </p>
+              )}
+            </section>
+          </div>
           <div className="profile-points-column">
             <section className="profile-points-card">
               <div className="profile-points-top">
@@ -356,6 +385,28 @@ export default function CustomerProfile() {
           </div>
         </div>
       </div>
+      <nav className="mobile-nav" aria-label="Navigasi utama">
+        <Link href="/?view=home">
+          <LayoutDashboard size={20} />
+          Beranda
+        </Link>
+        <Link href="/?view=services">
+          <Shirt size={20} />
+          Layanan
+        </Link>
+        <Link href="/?view=tracking">
+          <Package size={20} />
+          Tracking
+        </Link>
+        <Link href="/tentang">
+          <Store size={20} />
+          Tentang
+        </Link>
+        <Link className="active" aria-current="page" href="/profil">
+          <User size={20} />
+          Akun
+        </Link>
+      </nav>
     </main>
   );
 }

@@ -28,9 +28,21 @@ export function finalAmount(order: Order): number | null {
     return null;
   const service = calculateOrderPrice(order, order.actualKg);
   const discount = order.pointsUsed || 0;
-  if (!Number.isSafeInteger(discount) || discount < 0 || discount > service)
+  const membership = order.membershipUsed || 0;
+  if (
+    !Number.isSafeInteger(discount) ||
+    discount < 0 ||
+    !Number.isSafeInteger(membership) ||
+    membership < 0 ||
+    discount + membership > service
+  )
     return null;
-  const expected = service - discount + order.shippingFee;
+  const expected =
+    service -
+    discount -
+    membership +
+    order.shippingFee +
+    (order.insurance ? 1000 : 0);
   return Number.isSafeInteger(expected) &&
     expected >= 0 &&
     expected <= 10_000_000 &&

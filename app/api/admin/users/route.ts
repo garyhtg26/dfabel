@@ -8,6 +8,7 @@ import {
   ApiError,
 } from "@/lib/firebase/access";
 import { adminEmailAllowed } from "@/lib/access-policy";
+import { phoneFromLoginEmail } from "@/lib/phone-auth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const role = z.enum(["customer", "staff", "admin"]);
@@ -82,7 +83,10 @@ export async function GET(req: NextRequest) {
       : [];
     const users = result.users.map((u, i) => ({
       uid: u.uid,
-      email: u.email || "",
+      email: phoneFromLoginEmail(u.email) ? "" : u.email || "",
+      phoneAccount:
+        !!phoneFromLoginEmail(u.email) &&
+        u.customClaims?.dfable_phone_account === true,
       name: u.displayName || "",
       phone: profiles[i]?.get("phone") || "",
       createdAt: u.metadata.creationTime,
@@ -142,6 +146,15 @@ export async function POST(req: NextRequest) {
       }
     } else {
       const target = await adminAuth().getUser(input.uid);
+      if (
+        input.action === "access" &&
+        input.role !== "customer" &&
+        target.customClaims?.dfable_phone_account === true
+      )
+        throw new ApiError(
+          400,
+          "Akses staf memerlukan akun email terverifikasi.",
+        );
       if (
         target.uid === actor!.uid ||
         adminEmailAllowed(

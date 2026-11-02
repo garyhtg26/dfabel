@@ -20,6 +20,13 @@ import {
 import { createPayment, type Gateway } from "../../lib/payments/service";
 import { publicTracking } from "../../lib/tracking-data";
 import { redeemPoints } from "../../lib/loyalty";
+import { redeemMembership, reviewDeposit } from "../../lib/membership";
+import {
+  membershipProofPath,
+  storeMembershipProof,
+  submitMembershipDeposit,
+} from "../../lib/membership-proof";
+import { confirmPosCash } from "../../lib/payments/pos-cash";
 
 process.env.MIDTRANS_SERVER_KEY = "SB-Mid-server-unit-test-not-a-real-key";
 process.env.MIDTRANS_IS_PRODUCTION = "false";
@@ -149,6 +156,10 @@ class MemoryDatabase {
           this.values.set(ref.path, structuredClone(value));
         });
       },
+      delete: (ref: { path: string }) => {
+        writing = true;
+        writes.push(() => this.values.delete(ref.path));
+      },
     };
     try {
       const result = await callback(tx);
@@ -166,6 +177,73 @@ class MemoryDatabase {
   }
 }
 const upload = async () => {};
+test("cash confirmation is restricted to staff for unpaid POS orders and is idempotent", async () => {
+  const database = new MemoryDatabase({ ...order(), source: "pos", uid: null });
+  await assert.rejects(
+    confirmPosCash(order().id, customer, database.firestore()),
+    /admin/,
+  );
+  await assert.rejects(
+    confirmPosCash(order().id, staff, database.firestore(), 19999),
+    /Tagihan berubah/,
+  );
+  await confirmPosCash(order().id, staff, database.firestore());
+  const first = database.current();
+  assert.equal(first.paid, true);
+  assert.equal(first.paymentMethod, "cash");
+  assert.ok(first.paidAt);
+  await confirmPosCash(order().id, staff, database.firestore());
+  assert.equal(database.current().paymentRevision, first.paymentRevision);
+  const web = new MemoryDatabase();
+  await assert.rejects(
+    confirmPosCash(order().id, staff, web.firestore()),
+    /kasir/,
+  );
+  const pending = new MemoryDatabase({
+    ...order(),
+    source: "pos",
+    uid: null,
+    manualPayment: {
+      method: "bank_transfer",
+      status: "awaiting_review",
+      amount: 20000,
+      hasProof: true,
+    },
+  });
+  await assert.rejects(
+    confirmPosCash(order().id, staff, pending.firestore()),
+    /diperiksa/,
+  );
+});
+test("linked POS members alone can redeem their points and balance and earn once on cash settlement", async () => {
+  const database = new MemoryDatabase({
+    ...order(),
+    source: "pos",
+    membershipDiscount: true,
+    total: 16000,
+  });
+  database.values.set("loyalty/customer", { balance: 5000 });
+  database.values.set("memberships/customer", {
+    active: true,
+    balance: 100000,
+  });
+  await assert.rejects(
+    redeemPoints(database.firestore(), "other", order().id, 1000),
+    /pesanan sendiri/,
+  );
+  await assert.rejects(
+    redeemMembership(database.firestore(), "other", order().id, 2000),
+    /pesanan sendiri/,
+  );
+  await redeemPoints(database.firestore(), "customer", order().id, 1000);
+  await redeemMembership(database.firestore(), "customer", order().id, 2000);
+  assert.equal(database.current().total, 13000);
+  await confirmPosCash(order().id, staff, database.firestore(), 13000);
+  await confirmPosCash(order().id, staff, database.firestore(), 13000);
+  assert.equal(database.current().pointsEarned, 1500);
+  assert.equal(database.values.get("loyalty/customer")?.balance, 5500);
+  assert.equal(database.values.get("memberships/customer")?.balance, 98000);
+});
 async function proof(database: MemoryDatabase) {
   await selectManualPayment(order().id, database.firestore());
   const view = await storeManualProof(
@@ -715,6 +793,7 @@ test("points can be returned before payment and full points settle the order wit
   assert.equal(settled.balance, 0);
   assert.equal(settled.paid, true);
   assert.equal(database.current().pointsEarned, 0);
+  assert.ok(database.current().paidAt);
   await assert.rejects(
     redeemPoints(database.firestore(), "other", order().id, 0),
     /pesanan sendiri/,
@@ -761,4 +840,196 @@ test("changing points invalidates an uploaded draft proof before it can be submi
     submitManualPayment(order().id, oldVersion, database.firestore()),
     /unggah|bukti|berubah/i,
   );
+});
+
+test("membership proof is private to the account and consumed by exactly one pending deposit", async () => {
+  const database = new MemoryDatabase();
+  const paths: string[] = [];
+  const uploaded = await storeMembershipProof(
+    database.firestore(),
+    "customer",
+    new Uint8Array([1]),
+    async (path) => {
+      paths.push(path);
+    },
+  );
+  assert.equal(
+    paths[0],
+    membershipProofPath("customer", uploaded.proofVersion),
+  );
+  assert.notEqual(
+    paths[0],
+    membershipProofPath("other", uploaded.proofVersion),
+  );
+  const input = {
+    uid: "customer",
+    requestId: "73476a0d-2bdf-44ae-b4d8-f12af667cc2d",
+    proofVersion: uploaded.proofVersion,
+    amount: 100000,
+    branch: "cinere",
+    name: "Pelanggan",
+    senderName: "Pengirim",
+    bank: account,
+  };
+  await assert.rejects(
+    submitMembershipDeposit(database.firestore(), { ...input, uid: "other" }),
+    /bukti/i,
+  );
+  const attempts = await Promise.allSettled([
+    submitMembershipDeposit(database.firestore(), input),
+    submitMembershipDeposit(database.firestore(), input),
+  ]);
+  assert.equal(
+    attempts.filter((result) => result.status === "fulfilled").length,
+    1,
+  );
+  assert.equal(
+    database.values.get("membershipDeposits/customer")?.status,
+    "pending",
+  );
+  assert.equal(
+    database.values.get("membershipDeposits/customer")?.proofVersion,
+    uploaded.proofVersion,
+  );
+  assert.equal(database.values.has("membershipProofs/customer"), false);
+  await assert.rejects(
+    storeMembershipProof(
+      database.firestore(),
+      "customer",
+      new Uint8Array([1]),
+      async () => {},
+    ),
+    /menunggu/i,
+  );
+});
+
+test("membership deposit requires manager and repeated confirmations credit once", async () => {
+  const database = new MemoryDatabase();
+  const requestId = "73476a0d-2bdf-44ae-b4d8-f12af667cc2d";
+  database.values.set("membershipDeposits/customer", {
+    uid: "customer",
+    requestId,
+    amount: 100000,
+    branchId: "cinere",
+    status: "pending",
+  });
+  await assert.rejects(
+    reviewDeposit(
+      database.firestore(),
+      staff,
+      "customer",
+      requestId,
+      "confirm",
+    ),
+  );
+  await Promise.all([
+    reviewDeposit(
+      database.firestore(),
+      owner,
+      "customer",
+      requestId,
+      "confirm",
+    ),
+    reviewDeposit(
+      database.firestore(),
+      owner,
+      "customer",
+      requestId,
+      "confirm",
+    ),
+  ]);
+  assert.equal(database.values.get("memberships/customer")?.balance, 100000);
+  assert.equal(database.values.get("memberships/customer")?.active, true);
+  assert.equal(
+    database.values.get("membershipDeposits/customer")?.status,
+    "confirmed",
+  );
+});
+
+test("membership and points reduce discounted service but not insurance or shipping", async () => {
+  const value = {
+    ...order(),
+    membershipDiscount: true,
+    insurance: true,
+    shippingFee: 2000,
+    total: 19000,
+  };
+  const database = new MemoryDatabase(value);
+  database.values.set("memberships/customer", {
+    active: true,
+    balance: 100000,
+  });
+  database.values.set("loyalty/customer", { balance: 5000 });
+  const member = await redeemMembership(
+    database.firestore(),
+    "customer",
+    value.id,
+    10000,
+  );
+  assert.equal(member.total, 9000);
+  const points = await redeemPoints(
+    database.firestore(),
+    "customer",
+    value.id,
+    5000,
+  );
+  assert.equal(points.total, 4000);
+  assert.equal(database.values.get("memberships/customer")?.balance, 90000);
+  await assert.rejects(
+    redeemPoints(database.firestore(), "customer", value.id, 6001),
+  );
+});
+
+test("membership full settlement credits loyalty only once", async () => {
+  const value = { ...order(), membershipDiscount: true, total: 16000 };
+  const database = new MemoryDatabase(value);
+  database.values.set("memberships/customer", {
+    active: true,
+    balance: 100000,
+  });
+  const settled = await redeemMembership(
+    database.firestore(),
+    "customer",
+    value.id,
+    16000,
+  );
+  assert.equal(settled.paid, true);
+  assert.equal(database.values.get("loyalty/customer")?.balance, 1600);
+  await assert.rejects(
+    redeemMembership(database.firestore(), "customer", value.id, 16000),
+  );
+  assert.equal(database.values.get("memberships/customer")?.balance, 84000);
+});
+
+test("membership balance cannot be spent twice concurrently or while under review", async () => {
+  const first = { ...order(), membershipDiscount: true, total: 16000 };
+  const second = { ...first, id: "DF-ABCDEF123457" };
+  const database = new MemoryDatabase(first);
+  database.values.set(`orders/${second.id}`, structuredClone(second));
+  database.values.set("memberships/customer", { active: true, balance: 10000 });
+  const result = await Promise.allSettled([
+    redeemMembership(database.firestore(), "customer", first.id, 10000),
+    redeemMembership(database.firestore(), "customer", second.id, 10000),
+  ]);
+  assert.equal(result.filter((x) => x.status === "fulfilled").length, 1);
+  assert.equal(database.values.get("memberships/customer")?.balance, 0);
+  const wallet = database.values.get("memberships/customer")!;
+  wallet.balance = 5000;
+  wallet.reconciliationRequired = true;
+  await assert.rejects(
+    redeemMembership(database.firestore(), "customer", second.id, 5000),
+  );
+});
+
+test("existing discounted order can return reserved member balance even after wallet reaches zero", async () => {
+  const value = { ...order(), membershipDiscount: true, total: 16000 };
+  const database = new MemoryDatabase(value);
+  database.values.set("memberships/customer", { active: true, balance: 10000 });
+  await redeemMembership(database.firestore(), "customer", value.id, 10000);
+  assert.equal(database.values.get("memberships/customer")?.balance, 0);
+  assert.equal(database.current().total, 6000);
+  await redeemMembership(database.firestore(), "customer", value.id, 0);
+  assert.equal(database.values.get("memberships/customer")?.balance, 10000);
+  assert.equal(database.current().total, 16000);
+  assert.equal(database.current().membershipDiscount, true);
 });

@@ -21,12 +21,7 @@ export async function prepareEarn(
   database: Firestore,
   order: Order,
 ) {
-  if (
-    !order.uid ||
-    order.source !== "web" ||
-    order.pointsEarned !== undefined ||
-    order.actualKg === null
-  )
+  if (!order.uid || order.pointsEarned !== undefined || order.actualKg === null)
     return null;
   const points = Math.floor(
     (calculateOrderPrice(order, order.actualKg) - (order.pointsUsed || 0)) / 10,
@@ -78,7 +73,7 @@ export async function redeemPoints(
     ]);
     if (!orderSnap.exists) throw new ApiError(404, "Pesanan tidak ditemukan.");
     const order = orderSnap.data() as Order;
-    if (order.uid !== uid || order.source !== "web")
+    if (order.uid !== uid)
       throw new ApiError(
         403,
         "Poin hanya dapat digunakan untuk pesanan sendiri.",
@@ -114,7 +109,7 @@ export async function redeemPoints(
     if (
       !Number.isSafeInteger(points) ||
       points < 0 ||
-      points > service ||
+      points > service - (order.membershipUsed || 0) ||
       points > balance + current
     )
       throw new ApiError(400, "Jumlah poin melebihi saldo atau biaya layanan.");
@@ -126,7 +121,12 @@ export async function redeemPoints(
         paid: order.paid,
       };
     const now = new Date().toISOString();
-    const total = service - points + order.shippingFee;
+    const total =
+      service -
+      points -
+      (order.membershipUsed || 0) +
+      order.shippingFee +
+      (order.insurance ? 1000 : 0);
     const paid = total === 0;
     const earned = paid ? Math.floor((service - points) / 10) : 0;
     const nextBalance = balance + current - points + earned;
@@ -165,7 +165,9 @@ export async function redeemPoints(
             }),
           }
         : {}),
-      ...(paid ? { pointsEarned: earned, paymentMethod: "points" } : {}),
+      ...(paid
+        ? { pointsEarned: earned, paymentMethod: "points", paidAt: now }
+        : {}),
       paymentRevision: (order.paymentRevision || 0) + 1,
       updatedAt: now,
     });

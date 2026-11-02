@@ -17,7 +17,7 @@ export const serviceCategoryLabels = {
   household: "Household (Satuan)",
   premium: "Premium (Satuan)",
   additional: "Tambahan / Additional",
-  member: "Paket Bulanan",
+  member: "Membership",
 } as const;
 
 export const serviceCategoryOrder = [

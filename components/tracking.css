@@ -1,0 +1,226 @@
+.tracking-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.tracking-progress-card,
+.tracking-order-card,
+.tracking-history-card {
+  min-width: 0;
+  border: 1px solid #e8ebf3;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 8px 28px #1e285408;
+  overflow: hidden;
+}
+.tracking-status-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 25px 25px 23px;
+  background: #2521d5;
+  color: #fff;
+}
+.tracking-status-hero::after {
+  position: absolute;
+  content: "";
+  width: 180px;
+  height: 180px;
+  right: -65px;
+  top: -75px;
+  border: 30px solid #ffffff10;
+  border-radius: 50%;
+}
+.tracking-status-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.tracking-status-top span {
+  color: #d8dcff;
+  font-size: 11px;
+}
+.tracking-status-top b {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+.tracking-status-title {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 24px;
+}
+.tracking-status-title > span {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #ffffff21;
+}
+.tracking-status-title h2 {
+  margin: 0 0 4px;
+  color: white;
+  font-size: 21px;
+  line-height: 1.25;
+}
+.tracking-status-title p {
+  margin: 0;
+  color: #d3d9ff;
+  font-size: 12px;
+}
+.tracking-progress-body {
+  padding: 24px 25px 20px;
+}
+.tracking-progress-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.tracking-progress-heading h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.tracking-progress-heading span {
+  color: #9299aa;
+  font-size: 11px;
+}
+.tracking-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tracking-steps li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 13px;
+  position: relative;
+  min-height: 55px;
+}
+.tracking-steps li:not(:last-child)::after {
+  position: absolute;
+  content: "";
+  width: 2px;
+  top: 32px;
+  bottom: 0;
+  left: 15px;
+  background: #e9edf5;
+}
+.tracking-steps li.done::after {
+  background: #c8c6ff;
+}
+.tracking-step-icon {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f3f5f9;
+  color: #a2aabc;
+}
+.tracking-steps li.done .tracking-step-icon {
+  background: #edefff;
+  color: #4e49d9;
+}
+.tracking-steps li.current .tracking-step-icon {
+  background: #2b27da;
+  color: #fff;
+  box-shadow: 0 0 0 4px #eeeeff;
+}
+.tracking-step-copy {
+  padding: 6px 0 15px;
+  color: #9ba1ae;
+  font-size: 12px;
+}
+.tracking-steps li.current .tracking-step-copy {
+  color: #242943;
+  font-weight: 700;
+}
+.tracking-steps li.done .tracking-step-copy {
+  color: #687084;
+}
+.tracking-step-copy small {
+  display: block;
+  padding-top: 3px;
+  color: #625dde;
+  font-size: 10px;
+}
+.tracking-progress-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: #9096a7;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.tracking-progress-note svg {
+  flex: 0 0 auto;
+}
+.tracking-order-card {
+  padding: 24px;
+}
+.tracking-order-card .tracking-order-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tracking-order-top h3 {
+  margin: 3px 0 0;
+  font-size: 17px;
+}
+.tracking-order-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: #4e49d9;
+  background: #f0efff;
+}
+.tracking-history-card {
+  margin-top: 18px;
+  padding: 24px;
+}
+.tracking-history-card h3 {
+  margin: 0 0 20px;
+  font-size: 15px;
+}
+.tracking-history-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (max-width: 700px) {
+  .tracking-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .tracking-status-hero {
+    padding: 21px;
+  }
+  .tracking-status-title {
+    margin-top: 19px;
+  }
+  .tracking-progress-body,
+  .tracking-order-card,
+  .tracking-history-card {
+    padding: 20px;
+  }
+  .tracking-steps li {
+    min-height: 50px;
+  }
+  .tracking-history-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

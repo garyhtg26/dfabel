@@ -25,6 +25,13 @@ export const orderSchema = z.object({
       "Foto harus berupa JPEG",
     ),
   source: z.enum(["web", "pos"]),
+  insurance: z.boolean().default(false),
+  membershipCode: z
+    .string()
+    .regex(/^[A-F0-9]{10}$/)
+    .optional(),
+  posPayment: z.enum(["later", "cash", "transfer"]).optional(),
+  expectedTotal: z.number().int().min(0).max(10000000).optional(),
 });
 export const updateSchema = z.object({
   id: z.string().regex(/^DF-[A-F0-9]{12}$/),

@@ -35,6 +35,7 @@ type Props = {
   initialManualPayment?: ManualPaymentSummary;
   initialReviewRequired?: boolean;
   hideQrByDefault?: boolean;
+  hideProofByDefault?: boolean;
   onChanged?: () => void;
 };
 
@@ -64,6 +65,7 @@ export default function PaymentPanel({
   initialManualPayment,
   initialReviewRequired = false,
   hideQrByDefault = false,
+  hideProofByDefault = false,
   onChanged,
 }: Props) {
   const auth = useAuth();
@@ -89,6 +91,7 @@ export default function PaymentPanel({
   const [proofError, setProofError] = useState(false);
   const [proofRevision, setProofRevision] = useState(0);
   const [showQr, setShowQr] = useState(!hideQrByDefault);
+  const [showProof, setShowProof] = useState(!hideProofByDefault);
   const mounted = useRef(false);
   const request = useRef<AbortController | null>(null);
   const operation = useRef<AbortController | null>(null);
@@ -320,9 +323,13 @@ export default function PaymentPanel({
   }, [orderId, trackingToken, hideQrByDefault]);
 
   useEffect(() => {
+    setShowProof(!hideProofByDefault);
+  }, [orderId, trackingToken, hideProofByDefault]);
+
+  useEffect(() => {
     setProofAsset(null);
     setProofError(false);
-    if (!manual?.hasProof || !manual.proofVersion) return;
+    if (!showProof || !manual?.hasProof || !manual.proofVersion) return;
     const controller = new AbortController();
     let url = "";
     void auth
@@ -348,6 +355,7 @@ export default function PaymentPanel({
     proofEndpoint,
     proofKey,
     proofRevision,
+    showProof,
     auth.request,
   ]);
 
@@ -615,367 +623,381 @@ export default function PaymentPanel({
           (admin && !paid && !pending && !gatewayActive)) &&
           mode !== "qris" && (
             <>
-            {!pending && !paid && !view?.ready && (
-              <div
-                role="status"
-                className="payment-order-message rounded-xl border border-blue-100 bg-blue-50 px-3.5 py-3 text-xs leading-relaxed text-blue-800"
-              >
-                Metode pembayaran sudah dipilih. Toko akan mengonfirmasi berat
-                aktual dan ongkir sebelum kamu membayar.
-              </div>
-            )}
-            {bank && (
-              <div className="payment-order-bank overflow-hidden rounded-xl border border-slate-200">
-                <div className="flex items-center justify-between gap-2 bg-slate-50 px-4 py-3">
-                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-800">
-                    <Building2 size={16} />
-                    {bank.bankName || "BCA"}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    Transfer manual
-                  </span>
-                </div>
-                <div className="p-4">
-                  <p className="!mb-1 text-[10px] uppercase tracking-wider text-slate-400">
-                    Nomor rekening
-                  </p>
-                  <div className="flex items-center justify-between gap-2">
-                    <strong className="min-w-0 break-all text-xl font-semibold tracking-[.035em] text-slate-900 sm:text-2xl">
-                      {bank.accountNumber || "Belum diatur"}
-                    </strong>
-                    <button
-                      type="button"
-                      aria-label="Salin nomor rekening"
-                      disabled={!bank.accountNumber}
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(
-                            bank.accountNumber,
-                          );
-                          setCopied(true);
-                          setError("");
-                        } catch {
-                          setError(
-                            "Nomor rekening belum bisa disalin. Salin angka rekening secara manual.",
-                          );
-                        }
-                      }}
-                      className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40"
-                    >
-                      {copied ? <Check size={16} /> : <Copy size={16} />}
-                    </button>
-                  </div>
-                  <p className="!mb-0 !mt-2 text-xs text-slate-500">
-                    a.n.{" "}
-                    <b className="font-medium text-slate-800">
-                      {bank.accountHolder || "Nama pemilik belum diatur"}
-                    </b>
-                  </p>
-                  {copied && (
-                    <span
-                      role="status"
-                      className="mt-2 block text-[10px] font-medium text-emerald-600"
-                    >
-                      Nomor rekening disalin
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-            {!bankConfigured &&
-              (view?.bank.configured ? (
-                <button
-                  type="button"
-                  disabled={!!busy}
-                  onClick={() => void mutate("select")}
-                  className="payment-order-bank secondary !w-full !rounded-xl !py-3 !text-xs"
+              {!pending && !paid && !view?.ready && (
+                <div
+                  role="status"
+                  className="payment-order-message rounded-xl border border-blue-100 bg-blue-50 px-3.5 py-3 text-xs leading-relaxed text-blue-800"
                 >
-                  Tampilkan rekening pembayaran
-                </button>
-              ) : (
-                <p className="payment-order-bank !mb-0 rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-800">
-                  {admin
-                    ? "Rekening belum lengkap. Atur rekening pada menu Pembayaran."
-                    : "Rekening toko sedang disiapkan. Hubungi toko sebelum melakukan transfer."}
-                </p>
-              ))}
-            {!admin && !paid && !pending && !review && bankConfigured && (
-              <div className="payment-order-actions rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
-                <div className="mb-3 flex items-start gap-2.5">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-indigo-600">
-                    <ImagePlus size={18} />
-                  </span>
-                  <div>
-                    <b className="block text-sm font-semibold text-slate-900">
-                      Unggah bukti transfer
-                    </b>
-                    <p className="!mb-0 !mt-1 text-[11px] leading-relaxed text-slate-500">
-                      {manual?.hasProof && !view?.ready
-                        ? "Bukti sudah tersimpan. Toko perlu menyimpan berat aktual dan ongkir final sebelum kamu mengajukannya. Tidak perlu unggah ulang."
-                        : view?.ready
-                          ? "Pilih foto atau tangkapan layar bukti pembayaran."
-                          : "Bukti bisa diunggah sekarang. Pengajuan aktif setelah toko menyimpan berat aktual dan ongkir final."}
-                    </p>
-                  </div>
-                </div>
-                <input
-                  ref={fileInput}
-                  className="sr-only"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  aria-label="Pilih bukti transfer"
-                  onChange={(event) => void upload(event.target.files?.[0])}
-                  disabled={!canUploadProof}
-                />
-                <button
-                  type="button"
-                  disabled={!canUploadProof}
-                  onClick={() => fileInput.current?.click()}
-                  className="secondary !flex !w-full !items-center !justify-center !gap-2 !rounded-xl !py-3 !text-sm"
-                >
-                  {busy === "upload" ? (
-                    <Loader2 size={17} className="animate-spin" />
-                  ) : (
-                    <ImagePlus size={17} />
-                  )}
-                  {busy === "upload"
-                    ? "Mengunggah bukti…"
-                    : manual?.hasProof
-                      ? "Ganti bukti transfer"
-                      : "Pilih bukti transfer"}
-                </button>
-                <p className="!mb-0 !mt-2 text-center text-[10px] text-slate-400">
-                  JPG, PNG, atau WebP, maksimal 8 MB.
-                </p>
-                {manual?.hasProof && (
-                  <button
-                    type="button"
-                    disabled={!!busy || !canSubmit}
-                    onClick={() => void mutate("submit")}
-                    className="primary !mt-3 !flex !w-full !items-center !justify-center !gap-2 !rounded-xl !py-3.5 !text-sm disabled:!bg-slate-200 disabled:!text-slate-400"
-                  >
-                    {busy === "submit" ? (
-                      <Loader2 size={17} className="animate-spin" />
-                    ) : (
-                      <UploadCloud size={17} />
-                    )}
-                    {busy === "submit"
-                      ? "Mengajukan…"
-                      : "Saya sudah transfer · Ajukan konfirmasi"}
-                  </button>
-                )}
-              </div>
-            )}
-            {admin &&
-              bankConfigured &&
-              !paid &&
-              !pending &&
-              !review &&
-              !gatewayActive && (
-                <div className="payment-order-actions rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
-                <div className="mb-3">
-                  <b className="block text-sm font-semibold text-emerald-950">
-                    Konfirmasi pembayaran
-                  </b>
-                  <p className="!mb-0 !mt-1 text-[11px] leading-relaxed text-emerald-800">
-                    Cocokkan mutasi rekening. Konfirmasi admin tidak memerlukan
-                    unggahan pelanggan.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={!!busy || !canAdminConfirm}
-                  onClick={() => void mutate("confirm")}
-                  className="!flex !w-full !items-center !justify-center !gap-2 !rounded-xl !bg-emerald-600 !px-4 !py-3 !text-sm !font-semibold !text-white transition hover:!bg-emerald-700 disabled:!bg-slate-200 disabled:!text-slate-500"
-                >
-                  {busy === "confirm" ? (
-                    <Loader2 size={17} className="animate-spin" />
-                  ) : (
-                    <BadgeCheck size={17} />
-                  )}
-                  {busy === "confirm"
-                    ? "Menyimpan…"
-                    : "Transfer sudah diterima"}
-                </button>
-                {!view?.ready && (
-                  <p className="!mb-0 !mt-2 text-[10px] leading-relaxed text-emerald-800">
-                    Isi berat aktual dan ongkir pada form pesanan di atas, lalu
-                    klik Simpan perubahan. Isi 0 jika ongkir gratis.
-                  </p>
-                )}
+                  Metode pembayaran sudah dipilih. Toko akan mengonfirmasi berat
+                  aktual dan ongkir sebelum kamu membayar.
                 </div>
               )}
-            {manual?.hasProof && (
-              <div className="payment-order-receipt rounded-xl border border-slate-200 p-3">
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
-                    <FileCheck2 size={15} />
-                    {pending || paid
-                      ? "Bukti transfer"
-                      : rejected
-                        ? "Bukti sebelumnya"
-                        : "Bukti siap diajukan"}
-                  </span>
-                  {proofUrl && (
-                    <a
-                      href={proofUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[10px] font-medium text-indigo-600"
-                    >
-                      Lihat penuh
-                    </a>
-                  )}
-                </div>
-                {proofUrl ? (
-                  <img
-                    src={proofUrl}
-                    alt="Bukti transfer pesanan ini"
-                    className="mx-auto max-h-64 w-full rounded-lg bg-slate-50 object-contain"
-                  />
-                ) : proofError ? (
-                  <button
-                    type="button"
-                    className="text-button !text-xs"
-                    onClick={() => setProofRevision((value) => value + 1)}
-                  >
-                    Muat ulang bukti transfer
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2 py-5 text-xs text-slate-400">
-                    <Loader2 size={16} className="animate-spin" />
-                    Memuat bukti…
+              {bank && (
+                <div className="payment-order-bank overflow-hidden rounded-xl border border-slate-200">
+                  <div className="flex items-center justify-between gap-2 bg-slate-50 px-4 py-3">
+                    <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-800">
+                      <Building2 size={16} />
+                      {bank.bankName || "BCA"}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      Transfer manual
+                    </span>
                   </div>
-                )}
-              </div>
-            )}
-            {!paid && !pending && bankSelected && (
-              <div className="payment-order-qr rounded-xl border border-slate-100 bg-slate-50/60 p-4 text-center">
-                {hideQrByDefault && !showQr ? (
-                  <button
-                    type="button"
-                    aria-expanded={false}
-                    aria-controls={`manual-payment-qr-${orderId}`}
-                    onClick={() => setShowQr(true)}
-                    className="secondary !mx-auto !flex !items-center !justify-center !gap-2 !rounded-xl !px-5 !py-3 !text-sm"
-                  >
-                    <Eye size={17} /> Tampilkan QR
-                  </button>
-                ) : (
-                  <>
-                    <img
-                      id={`manual-payment-qr-${orderId}`}
-                      src={realQrUrl || "/payment-qr-placeholder.svg"}
-                      width={180}
-                      height={180}
-                      alt={
-                        realQrUrl
-                          ? `QR pembayaran ${bank?.bankName || "bank"} D’Fable`
-                          : "Contoh QR, belum dapat digunakan untuk pembayaran"
-                      }
-                      className="mx-auto aspect-square w-full max-w-[180px] rounded-lg bg-white object-contain"
-                      referrerPolicy="no-referrer"
-                    />
-                    <p
-                      className={`!mb-0 !mt-3 text-[11px] font-medium ${realQrUrl ? "text-slate-500" : "text-amber-700"}`}
-                    >
-                      {realQrUrl
-                        ? "Pembayaran QR ini tetap dikonfirmasi toko setelah bukti dikirim."
-                        : "Contoh QR · belum dapat dibayar"}
+                  <div className="p-4">
+                    <p className="!mb-1 text-[10px] uppercase tracking-wider text-slate-400">
+                      Nomor rekening
                     </p>
-                    {!realQrUrl && (
-                      <p className="!mb-0 !mt-1 text-[10px] text-slate-400">
-                        Gunakan nomor rekening di atas untuk transfer.
-                      </p>
-                    )}
-                    {hideQrByDefault && (
+                    <div className="flex items-center justify-between gap-2">
+                      <strong className="min-w-0 break-all text-xl font-semibold tracking-[.035em] text-slate-900 sm:text-2xl">
+                        {bank.accountNumber || "Belum diatur"}
+                      </strong>
                       <button
                         type="button"
-                        aria-expanded={true}
-                        aria-controls={`manual-payment-qr-${orderId}`}
-                        onClick={() => setShowQr(false)}
-                        className="secondary !mx-auto !mt-3 !flex !items-center !justify-center !gap-2 !rounded-xl !px-4 !py-2 !text-xs"
+                        aria-label="Salin nomor rekening"
+                        disabled={!bank.accountNumber}
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(
+                              bank.accountNumber,
+                            );
+                            setCopied(true);
+                            setError("");
+                          } catch {
+                            setError(
+                              "Nomor rekening belum bisa disalin. Salin angka rekening secara manual.",
+                            );
+                          }
+                        }}
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-indigo-600 transition hover:bg-indigo-50 disabled:opacity-40"
                       >
-                        <EyeOff size={15} /> Sembunyikan QR
+                        {copied ? <Check size={16} /> : <Copy size={16} />}
                       </button>
+                    </div>
+                    <p className="!mb-0 !mt-2 text-xs text-slate-500">
+                      a.n.{" "}
+                      <b className="font-medium text-slate-800">
+                        {bank.accountHolder || "Nama pemilik belum diatur"}
+                      </b>
+                    </p>
+                    {copied && (
+                      <span
+                        role="status"
+                        className="mt-2 block text-[10px] font-medium text-emerald-600"
+                      >
+                        Nomor rekening disalin
+                      </span>
                     )}
-                  </>
+                  </div>
+                </div>
+              )}
+              {!bankConfigured &&
+                (view?.bank.configured ? (
+                  <button
+                    type="button"
+                    disabled={!!busy}
+                    onClick={() => void mutate("select")}
+                    className="payment-order-bank secondary !w-full !rounded-xl !py-3 !text-xs"
+                  >
+                    Tampilkan rekening pembayaran
+                  </button>
+                ) : (
+                  <p className="payment-order-bank !mb-0 rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-800">
+                    {admin
+                      ? "Rekening belum lengkap. Atur rekening pada menu Pembayaran."
+                      : "Rekening toko sedang disiapkan. Hubungi toko sebelum melakukan transfer."}
+                  </p>
+                ))}
+              {!admin && !paid && !pending && !review && bankConfigured && (
+                <div className="payment-order-actions rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+                  <div className="mb-3 flex items-start gap-2.5">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white text-indigo-600">
+                      <ImagePlus size={18} />
+                    </span>
+                    <div>
+                      <b className="block text-sm font-semibold text-slate-900">
+                        Unggah bukti transfer
+                      </b>
+                      <p className="!mb-0 !mt-1 text-[11px] leading-relaxed text-slate-500">
+                        {manual?.hasProof && !view?.ready
+                          ? "Bukti sudah tersimpan. Toko perlu menyimpan berat aktual dan ongkir final sebelum kamu mengajukannya. Tidak perlu unggah ulang."
+                          : view?.ready
+                            ? "Pilih foto atau tangkapan layar bukti pembayaran."
+                            : "Bukti bisa diunggah sekarang. Pengajuan aktif setelah toko menyimpan berat aktual dan ongkir final."}
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    ref={fileInput}
+                    className="sr-only"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    aria-label="Pilih bukti transfer"
+                    onChange={(event) => void upload(event.target.files?.[0])}
+                    disabled={!canUploadProof}
+                  />
+                  <button
+                    type="button"
+                    disabled={!canUploadProof}
+                    onClick={() => fileInput.current?.click()}
+                    className="secondary !flex !w-full !items-center !justify-center !gap-2 !rounded-xl !py-3 !text-sm"
+                  >
+                    {busy === "upload" ? (
+                      <Loader2 size={17} className="animate-spin" />
+                    ) : (
+                      <ImagePlus size={17} />
+                    )}
+                    {busy === "upload"
+                      ? "Mengunggah bukti…"
+                      : manual?.hasProof
+                        ? "Ganti bukti transfer"
+                        : "Pilih bukti transfer"}
+                  </button>
+                  <p className="!mb-0 !mt-2 text-center text-[10px] text-slate-400">
+                    JPG, PNG, atau WebP, maksimal 8 MB.
+                  </p>
+                  {manual?.hasProof && (
+                    <button
+                      type="button"
+                      disabled={!!busy || !canSubmit}
+                      onClick={() => void mutate("submit")}
+                      className="primary !mt-3 !flex !w-full !items-center !justify-center !gap-2 !rounded-xl !py-3.5 !text-sm disabled:!bg-slate-200 disabled:!text-slate-400"
+                    >
+                      {busy === "submit" ? (
+                        <Loader2 size={17} className="animate-spin" />
+                      ) : (
+                        <UploadCloud size={17} />
+                      )}
+                      {busy === "submit"
+                        ? "Mengajukan…"
+                        : "Saya sudah transfer · Ajukan konfirmasi"}
+                    </button>
+                  )}
+                </div>
+              )}
+              {admin &&
+                bankConfigured &&
+                !paid &&
+                !pending &&
+                !review &&
+                !gatewayActive && (
+                  <div className="payment-order-actions rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+                    <div className="mb-3">
+                      <b className="block text-sm font-semibold text-emerald-950">
+                        Konfirmasi pembayaran
+                      </b>
+                      <p className="!mb-0 !mt-1 text-[11px] leading-relaxed text-emerald-800">
+                        Cocokkan mutasi rekening. Konfirmasi admin tidak
+                        memerlukan unggahan pelanggan.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!!busy || !canAdminConfirm}
+                      onClick={() => void mutate("confirm")}
+                      className="!flex !w-full !items-center !justify-center !gap-2 !rounded-xl !bg-emerald-600 !px-4 !py-3 !text-sm !font-semibold !text-white transition hover:!bg-emerald-700 disabled:!bg-slate-200 disabled:!text-slate-500"
+                    >
+                      {busy === "confirm" ? (
+                        <Loader2 size={17} className="animate-spin" />
+                      ) : (
+                        <BadgeCheck size={17} />
+                      )}
+                      {busy === "confirm"
+                        ? "Menyimpan…"
+                        : "Transfer sudah diterima"}
+                    </button>
+                    {!view?.ready && (
+                      <p className="!mb-0 !mt-2 text-[10px] leading-relaxed text-emerald-800">
+                        Isi berat aktual dan ongkir pada form pesanan di atas,
+                        lalu klik Simpan perubahan. Isi 0 jika ongkir gratis.
+                      </p>
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-            {pending && !admin && (
-              <p className="payment-order-actions !mb-0 rounded-xl bg-amber-50 px-3 py-3 text-center text-xs leading-relaxed text-amber-900">
-                Kamu tidak perlu membayar ulang. Status akan berubah setelah
-                toko memeriksa bukti transfer.
-              </p>
-            )}
-            {pending && admin && !review && (
-              <div className="payment-order-actions rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-                <p className="!mb-3 text-xs font-medium leading-relaxed text-amber-900">
-                  Cocokkan bukti dengan mutasi rekening sebelum mengonfirmasi.
-                </p>
-                {rejecting ? (
-                  <div className="space-y-3">
-                    <label className="!text-xs !font-medium">
-                      Alasan penolakan
-                      <textarea
-                        rows={2}
-                        maxLength={500}
-                        value={note}
-                        onChange={(event) => setNote(event.target.value)}
-                        placeholder="Contoh: nominal transfer belum sesuai tagihan"
-                        className="!mt-2 !rounded-lg !text-xs"
+              {manual?.hasProof && (
+                <div className="payment-order-receipt rounded-xl border border-slate-200 p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+                      <FileCheck2 size={15} />
+                      {pending || paid
+                        ? "Bukti transfer"
+                        : rejected
+                          ? "Bukti sebelumnya"
+                          : "Bukti siap diajukan"}
+                    </span>
+                    {showProof && proofUrl && (
+                      <a
+                        href={proofUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] font-medium text-indigo-600"
+                      >
+                        Lihat penuh
+                      </a>
+                    )}
+                  </div>
+                  {hideProofByDefault && (
+                    <button
+                      type="button"
+                      className="secondary !mb-3 !flex !w-full !items-center !justify-center !gap-2 !rounded-xl !py-2 !text-xs"
+                      aria-expanded={showProof}
+                      onClick={() => setShowProof((value) => !value)}
+                    >
+                      {showProof ? <EyeOff size={15} /> : <Eye size={15} />}
+                      {showProof
+                        ? "Sembunyikan bukti transfer"
+                        : "Lihat bukti transfer"}
+                    </button>
+                  )}
+                  {showProof &&
+                    (proofUrl ? (
+                      <img
+                        src={proofUrl}
+                        alt="Bukti transfer pesanan ini"
+                        className="mx-auto max-h-64 w-full rounded-lg bg-slate-50 object-contain"
                       />
-                    </label>
-                    <div className="flex gap-2">
+                    ) : proofError ? (
+                      <button
+                        type="button"
+                        className="text-button !text-xs"
+                        onClick={() => setProofRevision((value) => value + 1)}
+                      >
+                        Muat ulang bukti transfer
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2 py-5 text-xs text-slate-400">
+                        <Loader2 size={16} className="animate-spin" />
+                        Memuat bukti…
+                      </div>
+                    ))}
+                </div>
+              )}
+              {!paid && !pending && (bankSelected || admin) && (
+                <div className="payment-order-qr rounded-xl border border-slate-100 bg-slate-50/60 p-4 text-center">
+                  {hideQrByDefault && !showQr ? (
+                    <button
+                      type="button"
+                      aria-expanded={false}
+                      aria-controls={`manual-payment-qr-${orderId}`}
+                      onClick={() => setShowQr(true)}
+                      className="secondary !mx-auto !flex !items-center !justify-center !gap-2 !rounded-xl !px-5 !py-3 !text-sm"
+                    >
+                      <Eye size={17} /> Tampilkan QR
+                    </button>
+                  ) : (
+                    <>
+                      <img
+                        id={`manual-payment-qr-${orderId}`}
+                        src={realQrUrl || "/payment-qr-placeholder.svg"}
+                        width={180}
+                        height={180}
+                        alt={
+                          realQrUrl
+                            ? `QR pembayaran ${bank?.bankName || "bank"} D’Fable`
+                            : "Contoh QR, belum dapat digunakan untuk pembayaran"
+                        }
+                        className="mx-auto aspect-square w-full max-w-[180px] rounded-lg bg-white object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                      <p
+                        className={`!mb-0 !mt-3 text-[11px] font-medium ${realQrUrl ? "text-slate-500" : "text-amber-700"}`}
+                      >
+                        {realQrUrl
+                          ? "Pembayaran QR ini tetap dikonfirmasi toko setelah bukti dikirim."
+                          : "Contoh QR · belum dapat dibayar"}
+                      </p>
+                      {!realQrUrl && (
+                        <p className="!mb-0 !mt-1 text-[10px] text-slate-400">
+                          Gunakan nomor rekening di atas untuk transfer.
+                        </p>
+                      )}
+                      {hideQrByDefault && (
+                        <button
+                          type="button"
+                          aria-expanded={true}
+                          aria-controls={`manual-payment-qr-${orderId}`}
+                          onClick={() => setShowQr(false)}
+                          className="secondary !mx-auto !mt-3 !flex !items-center !justify-center !gap-2 !rounded-xl !px-4 !py-2 !text-xs"
+                        >
+                          <EyeOff size={15} /> Sembunyikan QR
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+              {pending && !admin && (
+                <p className="payment-order-actions !mb-0 rounded-xl bg-amber-50 px-3 py-3 text-center text-xs leading-relaxed text-amber-900">
+                  Kamu tidak perlu membayar ulang. Status akan berubah setelah
+                  toko memeriksa bukti transfer.
+                </p>
+              )}
+              {pending && admin && !review && (
+                <div className="payment-order-actions rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+                  <p className="!mb-3 text-xs font-medium leading-relaxed text-amber-900">
+                    Cocokkan bukti dengan mutasi rekening sebelum mengonfirmasi.
+                  </p>
+                  {rejecting ? (
+                    <div className="space-y-3">
+                      <label className="!text-xs !font-medium">
+                        Alasan penolakan
+                        <textarea
+                          rows={2}
+                          maxLength={500}
+                          value={note}
+                          onChange={(event) => setNote(event.target.value)}
+                          placeholder="Contoh: nominal transfer belum sesuai tagihan"
+                          className="!mt-2 !rounded-lg !text-xs"
+                        />
+                      </label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={!!busy}
+                          onClick={() => {
+                            setRejecting(false);
+                            setNote("");
+                          }}
+                          className="secondary !flex-1 !rounded-lg !py-2 !text-xs"
+                        >
+                          Kembali
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!!busy || note.trim().length < 3}
+                          onClick={() => void mutate("reject")}
+                          className="!flex-1 !rounded-lg !bg-rose-600 !px-3 !py-2 !text-xs !font-semibold !text-white disabled:opacity-50"
+                        >
+                          {busy === "reject" ? "Menyimpan…" : "Tolak bukti"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         disabled={!!busy}
-                        onClick={() => {
-                          setRejecting(false);
-                          setNote("");
-                        }}
-                        className="secondary !flex-1 !rounded-lg !py-2 !text-xs"
+                        onClick={() => setRejecting(true)}
+                        className="secondary !rounded-xl !py-3 !text-xs"
                       >
-                        Kembali
+                        Perlu diperbaiki
                       </button>
                       <button
                         type="button"
-                        disabled={!!busy || note.trim().length < 3}
-                        onClick={() => void mutate("reject")}
-                        className="!flex-1 !rounded-lg !bg-rose-600 !px-3 !py-2 !text-xs !font-semibold !text-white disabled:opacity-50"
+                        disabled={!!busy}
+                        onClick={() => void mutate("approve")}
+                        className="!flex !items-center !justify-center !gap-1.5 !rounded-xl !bg-emerald-600 !px-3 !py-3 !text-xs !font-semibold !text-white hover:!bg-emerald-700 disabled:opacity-50"
                       >
-                        {busy === "reject" ? "Menyimpan…" : "Tolak bukti"}
+                        {busy === "approve" ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <BadgeCheck size={16} />
+                        )}
+                        Konfirmasi lunas
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      disabled={!!busy}
-                      onClick={() => setRejecting(true)}
-                      className="secondary !rounded-xl !py-3 !text-xs"
-                    >
-                      Perlu diperbaiki
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!!busy}
-                      onClick={() => void mutate("approve")}
-                      className="!flex !items-center !justify-center !gap-1.5 !rounded-xl !bg-emerald-600 !px-3 !py-3 !text-xs !font-semibold !text-white hover:!bg-emerald-700 disabled:opacity-50"
-                    >
-                      {busy === "approve" ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <BadgeCheck size={16} />
-                      )}
-                      Konfirmasi lunas
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
             </>
           )}
 

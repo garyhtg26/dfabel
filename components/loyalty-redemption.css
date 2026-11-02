@@ -1,0 +1,144 @@
+.loyalty-use {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid #dedfff;
+  border-radius: 16px;
+  background: #f7f7ff;
+}
+.loyalty-use-heading {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.loyalty-use-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 11px;
+  color: #3732d1;
+  background: #e9e8ff;
+}
+.loyalty-use-heading h4 {
+  margin: 0;
+  color: #252b40;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.loyalty-use-heading p {
+  margin: 4px 0 0;
+  color: #737c91;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.loyalty-use-applied {
+  margin: 12px 0 0;
+  color: #2621bd;
+  font-size: 12px;
+  font-weight: 700;
+}
+.loyalty-use-note,
+.loyalty-use-hint,
+.loyalty-use-message {
+  margin: 11px 0 0;
+  color: #697186;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.loyalty-login-hint {
+  margin-bottom: 20px;
+  padding: 16px;
+  border: 1px solid #dedfff;
+  border-radius: 16px;
+  background: #f7f7ff;
+}
+.loyalty-login-hint b {
+  color: #252b40;
+  font-size: 14px;
+}
+.loyalty-login-hint p {
+  margin: 6px 0 9px;
+  color: #697186;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.loyalty-login-hint a {
+  color: #302acb;
+  font-size: 12px;
+  font-weight: 700;
+}
+.loyalty-use-note button,
+.loyalty-use-actions button {
+  border: 0;
+  padding: 0;
+  color: #302acb;
+  background: none;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.loyalty-use-controls {
+  margin-top: 14px;
+}
+.loyalty-use-controls label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 7px;
+  color: #454c61;
+  font-size: 12px;
+  font-weight: 700;
+}
+.loyalty-use-controls label small {
+  color: #9298aa;
+  font-size: 11px;
+  font-weight: 400;
+}
+.loyalty-use-input-row {
+  display: flex;
+  gap: 8px;
+}
+.loyalty-use-input-row input {
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #daddec;
+  border-radius: 10px;
+  background: #fff;
+  color: #242a3d;
+  font-size: 16px;
+}
+.loyalty-use-input-row input:focus-visible {
+  outline: 2px solid #a9a6ff;
+  outline-offset: 1px;
+}
+.loyalty-use-input-row .loyalty-use-apply {
+  flex: none;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  color: #fff;
+  background: #2924d1;
+  font-size: 12px;
+  font-weight: 700;
+}
+.loyalty-use button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.loyalty-use-actions {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.loyalty-use-hint {
+  color: #8a91a2;
+  font-size: 11px;
+}
+.loyalty-use-message {
+  color: #302acb;
+}

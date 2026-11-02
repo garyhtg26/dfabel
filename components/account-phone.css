@@ -1,0 +1,45 @@
+.auth-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #171a3899;
+  backdrop-filter: blur(4px);
+}
+.auth-confirm-card {
+  width: min(100%, 390px);
+  padding: 25px;
+  border-radius: 20px;
+  background: white;
+  box-shadow: 0 20px 60px #16183840;
+}
+.auth-confirm-card h3 {
+  margin: 0 0 10px;
+  font-size: 19px;
+}
+.auth-confirm-card p {
+  color: #73798d;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.auth-confirm-card strong {
+  display: block;
+  margin: 18px 0;
+  color: #2521da;
+  font-size: 19px;
+  overflow-wrap: anywhere;
+}
+.auth-confirm-card > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.auth-confirm-card > div button {
+  flex: 1;
+  min-width: 120px;
+}
+.auth-confirm-card .auth-confirm-error {
+  color: #b42318;
+}

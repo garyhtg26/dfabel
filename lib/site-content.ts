@@ -38,13 +38,20 @@ export type SiteContent = z.infer<typeof contentSchema> & {
 };
 export const defaultContent: SiteContent = {
   people: { title: "Jemput & antar", button: "Jadwalkan jemput", active: true },
-  member: { title: "Paket bulanan", button: "Lihat paket", active: true },
+  member: {
+    title: "Membership D’Fable",
+    button: "Lihat membership",
+    active: true,
+  },
   tracking: { title: "Lacak pesanan", active: true },
 };
 export function siteContent(value?: Partial<SiteContent>): SiteContent {
+  const member = { ...defaultContent.member, ...value?.member };
+  if (member.title === "Paket bulanan") member.title = "Membership D’Fable";
+  if (member.button === "Lihat paket") member.button = "Lihat membership";
   return {
     people: { ...defaultContent.people, ...value?.people },
-    member: { ...defaultContent.member, ...value?.member },
+    member,
     tracking: { ...defaultContent.tracking, ...value?.tracking },
     images: { ...value?.images },
   };

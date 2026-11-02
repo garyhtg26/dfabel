@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowRight,
   LogOut,
@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { authErrorMessage } from "@/lib/auth-error";
+import { phoneFromLoginEmail, phoneLoginEmail } from "@/lib/phone-auth";
+import "./account-phone.css";
 export default function AccountPanel({
   onDone,
   phone = "",
@@ -31,6 +33,11 @@ export default function AccountPanel({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [cooldown, setCooldown] = useState(0);
+  const [confirmPhone, setConfirmPhone] = useState(false);
+  const confirmation = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (confirmPhone) confirmation.current?.focus();
+  }, [confirmPhone]);
   useEffect(() => {
     if (!cooldown) return;
     const timer = setTimeout(() => setCooldown((value) => value - 1), 1000);
@@ -43,7 +50,17 @@ export default function AccountPanel({
     try {
       await action();
     } catch (e) {
-      setError(authErrorMessage(e, window.location.hostname));
+      const code = (e as { code?: string })?.code;
+      setError(
+        !admin &&
+          [
+            "auth/invalid-credential",
+            "auth/user-not-found",
+            "auth/wrong-password",
+          ].includes(code || "")
+          ? "Nomor WhatsApp atau password tidak cocok."
+          : authErrorMessage(e, window.location.hostname),
+      );
     } finally {
       setBusy(false);
     }
@@ -71,10 +88,12 @@ export default function AccountPanel({
       {(signedIn || (auth.user && !auth.verified) || mode === "reset") && (
         <p className="auth-subtitle">
           {signedIn
-            ? auth.user?.email
+            ? phoneFromLoginEmail(auth.user?.email) || auth.user?.email
             : auth.user && !auth.verified
               ? `Verifikasi ${auth.user.email} untuk melanjutkan.`
-              : "Tautan reset akan dikirim ke email kamu."}
+              : admin
+                ? "Tautan reset akan dikirim ke email kamu."
+                : "Jika akunmu memakai email, kami akan mengirim tautan reset. Untuk akun nomor WhatsApp, hubungi toko."}
         </p>
       )}
       {auth.user && !auth.verified ? (
@@ -198,11 +217,14 @@ export default function AccountPanel({
                     "Jika email terdaftar, tautan pengaturan password akan dikirim.",
                   );
                 } else if (mode === "register") {
-                  await auth.register(name.trim(), email.trim(), password);
-                  setCooldown(60);
-                  setPassword("");
+                  if (!phoneLoginEmail(email))
+                    throw Object.assign(new Error(), {
+                      code: "auth/invalid-phone-number",
+                    });
+                  setConfirmPhone(true);
                 } else {
-                  await auth.loginEmail(email.trim(), password);
+                  if (admin) await auth.loginEmail(email.trim(), password);
+                  else await auth.loginPhone(email.trim(), password);
                   setPassword("");
                   if (await auth.refresh()) onDone?.();
                 }
@@ -217,20 +239,39 @@ export default function AccountPanel({
                   autoComplete="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  maxLength={100}
+                  minLength={2}
+                  maxLength={80}
                   placeholder="Nama kamu"
                 />
               </label>
             )}
             <label>
-              Email
+              {admin || mode === "reset"
+                ? "Email"
+                : mode === "register"
+                  ? "Nomor WhatsApp"
+                  : "Nomor WhatsApp atau email"}
               <input
-                type="email"
+                type={
+                  admin || mode === "reset"
+                    ? "email"
+                    : mode === "register"
+                      ? "tel"
+                      : "text"
+                }
                 required
-                autoComplete="email"
+                autoComplete={
+                  admin || mode === "reset"
+                    ? "email"
+                    : mode === "register"
+                      ? "tel"
+                      : "username"
+                }
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@email.com"
+                placeholder={
+                  admin || mode === "reset" ? "nama@email.com" : "08xxxxxxxxxx"
+                }
               />
             </label>
             {mode !== "reset" && (
@@ -358,6 +399,92 @@ export default function AccountPanel({
         <p role="alert" className="auth-error">
           {error}
         </p>
+      )}
+      {confirmPhone && (
+        <div className="auth-confirm-backdrop">
+          <div
+            className="auth-confirm-card"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-phone-title"
+            aria-describedby="confirm-phone-copy"
+            ref={confirmation}
+            tabIndex={-1}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && !busy) {
+                event.preventDefault();
+                event.stopPropagation();
+                setConfirmPhone(false);
+              }
+              if (event.key === "Tab") {
+                const buttons = Array.from(
+                  confirmation.current?.querySelectorAll<HTMLButtonElement>(
+                    "button:not(:disabled)",
+                  ) || [],
+                );
+                if (!buttons.length) return;
+                const first = buttons[0];
+                const last = buttons[buttons.length - 1];
+                if (
+                  event.shiftKey &&
+                  (document.activeElement === first ||
+                    document.activeElement === confirmation.current)
+                ) {
+                  event.preventDefault();
+                  last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                  event.preventDefault();
+                  first.focus();
+                }
+              }
+            }}
+          >
+            <h3 id="confirm-phone-title">Pastikan nomor WhatsApp benar</h3>
+            <p id="confirm-phone-copy">
+              Nomor ini akan menjadi akun masuk kamu. Kami tidak mengirim kode
+              verifikasi.
+            </p>
+            <strong>
+              {phoneLoginEmail(email)
+                ? phoneFromLoginEmail(phoneLoginEmail(email))
+                : email}
+            </strong>
+            {error && (
+              <p role="alert" className="auth-confirm-error">
+                {error}
+              </p>
+            )}
+            <div>
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy}
+                onClick={() => setConfirmPhone(false)}
+              >
+                Periksa lagi
+              </button>
+              <button
+                type="button"
+                className="primary"
+                disabled={busy}
+                onClick={() =>
+                  run(async () => {
+                    await auth.registerPhone(
+                      name.trim(),
+                      email.trim(),
+                      password,
+                    );
+                    setConfirmPhone(false);
+                    setPassword("");
+                    onDone?.();
+                  })
+                }
+              >
+                {busy ? "Membuat akun…" : "Ya, buat akun"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       <p className="auth-footer">
         <ShieldCheck size={13} /> Akun aman. Laundry nyaman.

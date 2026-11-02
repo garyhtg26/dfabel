@@ -1292,6 +1292,11 @@ dialog > form > .muted {
 dialog.order-dialog {
   width: 620px;
 }
+@media (min-width: 721px) {
+  dialog.dashboard-dialog {
+    width: min(780px, calc(100vw - 48px));
+  }
+}
 .close-button {
   position: absolute;
   right: 16px;
@@ -1479,6 +1484,59 @@ label > small {
 .weight-control span {
   color: #a4a7b5;
   font-size: 11px;
+}
+.pos-payment-choice {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0;
+  padding: 0;
+  border: 0;
+}
+.pos-payment-choice legend {
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 650;
+}
+.pos-payment-choice label {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 13px;
+  border: 1px solid #e5e8f0;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.pos-payment-choice label.selected {
+  border-color: #8b86f0;
+  background: #f7f6ff;
+}
+.pos-payment-choice input {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  accent-color: #2621da;
+}
+.pos-payment-choice b,
+.pos-payment-choice small {
+  display: block;
+}
+.pos-payment-choice b {
+  font-size: 13px;
+}
+.pos-payment-choice small {
+  margin-top: 4px;
+  color: #7d8394;
+  font-size: 11px;
+  line-height: 1.4;
+}
+@media (max-width: 600px) {
+  .pos-payment-choice {
+    grid-template-columns: 1fr;
+  }
 }
 .speed-choice {
   display: flex;
@@ -4565,3 +4623,25 @@ input[type="checkbox"] {
     overflow-wrap: anywhere;
   }
 }
+
+.insurance-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  margin: 18px 0;
+  border: 1px solid #d6e1fa;
+  border-radius: 14px;
+  background: #f7f9ff;
+  cursor: pointer;
+}
+.insurance-choice input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin: 2px 0 0;
+  accent-color: #3024d9;
+}
+.insurance-choice span { display: grid; gap: 4px; }
+.insurance-choice b { color: #16254d; font-size: 14px; }
+.insurance-choice small { color: #596780; font-size: 12px; line-height: 1.5; }

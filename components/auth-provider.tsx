@@ -11,8 +11,6 @@ import {
   GoogleAuthProvider,
   onIdTokenChanged,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updateProfile,
   sendEmailVerification,
   sendPasswordResetEmail,
   reload,
@@ -22,6 +20,7 @@ import {
 } from "firebase/auth";
 import { clientAuth, clientReady } from "@/lib/firebase/client";
 import { accountName, type AuthScope } from "@/lib/auth-ui";
+import { isPhoneLogin, phoneLoginEmail } from "@/lib/phone-auth";
 type Session = {
   user: User | null;
   loading: boolean;
@@ -35,7 +34,12 @@ type AuthContextValue = Session & {
   configured: boolean;
   login: () => Promise<void>;
   loginEmail: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  loginPhone: (identifier: string, password: string) => Promise<void>;
+  registerPhone: (
+    name: string,
+    phone: string,
+    password: string,
+  ) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   verifyEmail: () => Promise<void>;
   refresh: () => Promise<boolean>;
@@ -56,7 +60,8 @@ const AuthContext = createContext<AuthContextValue>({
   configured: false,
   login: async () => {},
   loginEmail: async () => {},
-  register: async () => {},
+  loginPhone: async () => {},
+  registerPhone: async () => {},
   resetPassword: async () => {},
   verifyEmail: async () => {},
   refresh: async () => false,
@@ -78,7 +83,14 @@ export function AuthProvider({
     setSession((prev) => ({
       user: current,
       loading: false,
-      verified: !!current?.emailVerified,
+      verified:
+        !!current?.emailVerified ||
+        (scope === "customer" &&
+          isPhoneLogin(
+            current?.email,
+            result?.signInProvider,
+            result?.claims.dfable_phone_account,
+          )),
       provider: result?.signInProvider || "",
       name: accountName(current),
       revision: prev.revision + 1,
@@ -88,9 +100,17 @@ export function AuthProvider({
     const current = clientReady ? clientAuth(scope).currentUser : null;
     if (!current) return false;
     await reload(current);
-    await current.getIdToken(true);
+    const token = await current.getIdTokenResult(true);
     await sync();
-    return current.emailVerified;
+    return (
+      current.emailVerified ||
+      (scope === "customer" &&
+        isPhoneLogin(
+          current.email,
+          token.signInProvider,
+          token.claims.dfable_phone_account,
+        ))
+    );
   }, [scope, sync]);
   useEffect(() => {
     if (!clientReady) {
@@ -138,8 +158,18 @@ export function AuthProvider({
       const headers = new Headers(init.headers);
       headers.set("X-DFable-Surface", scope);
       const current = clientReady ? clientAuth(scope).currentUser : null;
-      if (current?.emailVerified)
-        headers.set("Authorization", `Bearer ${await current.getIdToken()}`);
+      if (current) {
+        const token = await current.getIdTokenResult();
+        const eligible =
+          current.emailVerified ||
+          (scope === "customer" &&
+            isPhoneLogin(
+              current.email,
+              token.signInProvider,
+              token.claims.dfable_phone_account,
+            ));
+        if (eligible) headers.set("Authorization", `Bearer ${token.token}`);
+      }
       return fetch(url, { ...init, headers });
     },
     [scope],
@@ -163,16 +193,46 @@ export function AuthProvider({
           await signInWithEmailAndPassword(clientAuth(scope), email, password);
           await sync();
         },
-        register: async (name, email, password) => {
-          if (scope !== "customer") throw Error("Customer signup only");
-          const result = await createUserWithEmailAndPassword(
-            clientAuth(scope),
-            email,
-            password,
-          );
-          await updateProfile(result.user, { displayName: name });
+        loginPhone: async (identifier, password) => {
+          if (scope !== "customer") throw Error("Customer login only");
+          const email = identifier.includes("@")
+            ? identifier.trim()
+            : phoneLoginEmail(identifier);
+          if (!email)
+            throw Object.assign(new Error("Nomor WhatsApp tidak valid."), {
+              code: "auth/invalid-phone-number",
+            });
+          await signInWithEmailAndPassword(clientAuth(scope), email, password);
           await sync();
-          await sendEmailVerification(result.user, actionSettings());
+        },
+        registerPhone: async (name, phone, password) => {
+          if (scope !== "customer") throw Error("Customer signup only");
+          const email = phoneLoginEmail(phone);
+          if (!email)
+            throw Object.assign(new Error("Nomor WhatsApp tidak valid."), {
+              code: "auth/invalid-phone-number",
+            });
+          const response = await fetch("/api/auth/phone/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, phone, password }),
+          });
+          if (!response.ok) {
+            const result = await response.json().catch(() => ({}));
+            throw Object.assign(
+              new Error(result.error || "Pendaftaran belum berhasil."),
+              {
+                code:
+                  response.status === 409
+                    ? "auth/phone-already-exists"
+                    : response.status === 429
+                      ? "auth/too-many-requests"
+                      : "auth/phone-register-failed",
+              },
+            );
+          }
+          await signInWithEmailAndPassword(clientAuth(scope), email, password);
+          await sync();
         },
         resetPassword: async (email) => {
           await sendPasswordResetEmail(
