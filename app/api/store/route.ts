@@ -222,7 +222,18 @@ export async function POST(req: NextRequest) {
           throw new ApiError(400, "Konfirmasi ongkir sebelum menandai lunas.");
         if (o.unit && o.unit !== "kg" && !Number.isInteger(v.actualKg))
           throw new ApiError(400, "Jumlah aktual item harus bilangan bulat.");
-        const total = calculateOrderPrice(o, v.actualKg) + (v.shippingFee ?? 0);
+        const serviceTotal = calculateOrderPrice(o, v.actualKg);
+        if ((o.pointsUsed || 0) > serviceTotal)
+          throw new ApiError(
+            409,
+            "Poin yang digunakan melebihi harga layanan. Minta pelanggan mengurangi poin terlebih dahulu.",
+          );
+        const total = serviceTotal - (o.pointsUsed || 0) + (v.shippingFee ?? 0);
+        if (total === 0 && !o.paid)
+          throw new ApiError(
+            409,
+            "Minta pelanggan mengurangi poin sebelum mengubah jumlah atau ongkir ini.",
+          );
         if (v.paid !== o.paid)
           throw new ApiError(
             409,

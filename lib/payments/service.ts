@@ -26,6 +26,7 @@ import {
 } from "./policy";
 import type { PaymentAttempt, PaymentView, ProviderTransaction } from "./types";
 import { bankDetails, manualLocked, safeManualSummary } from "./manual-policy";
+import { prepareEarn, commitEarn } from "../loyalty";
 
 export const gateway = {
   status: providerGetStatus,
@@ -156,13 +157,37 @@ export async function applyVerifiedTransaction(
       attempt.qrUrl !== qrUrl ||
       attempt.expiresAt !== updated.expiresAt ||
       !!updated.reconciliationRequired !== !!attempt.reconciliationRequired;
+    const earn =
+      order &&
+      status === "paid" &&
+      !order.paid &&
+      !conflict &&
+      current &&
+      matchingTotal &&
+      attempt.environment === "production"
+        ? await prepareEarn(tx, database, order)
+        : null;
+    const loyaltyReviewRef =
+      order?.uid &&
+      financialException(transaction) &&
+      (order.pointsEarned || order.pointsUsed)
+        ? database.doc(`loyalty/${order.uid}`)
+        : null;
+    if (loyaltyReviewRef) await tx.get(loyaltyReviewRef);
     tx.set(attemptRef, updated);
+    if (loyaltyReviewRef)
+      tx.set(
+        loyaltyReviewRef,
+        { reconciliationRequired: true, updatedAt: now },
+        { merge: true },
+      );
     if (order) {
       if (current && (changed || (status === "paid" && !order.paid)))
         tx.update(orderRef, {
           payment: safeSummary(updated),
           paymentRevision: (order.paymentRevision || 0) + 1,
           ...(status === "paid" && matchingTotal ? { paid: true } : {}),
+          ...commitEarn(tx, database, order, earn, now),
           ...(conflict ? { paymentReconciliationRequired: true } : {}),
           updatedAt: now,
         });
@@ -240,7 +265,7 @@ export async function createPayment(
     )
       throw new ApiError(409, "Pembayaran pesanan ini perlu diperiksa toko.");
     const amount = finalAmount(latest);
-    if (amount === null)
+    if (amount === null || amount <= 0)
       throw new ApiError(
         409,
         "Tunggu toko mengonfirmasi berat aktual dan ongkir sebelum membayar.",

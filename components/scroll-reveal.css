@@ -1,0 +1,36 @@
+@media (prefers-reduced-motion: no-preference) {
+  [data-scroll-reveal][data-reveal-state="pending"]:not(:focus-within) {
+    opacity: 0;
+  }
+
+  [data-scroll-reveal][data-reveal-state="visible"]:not(:focus-within) {
+    animation: reveal-arrive 750ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: var(--reveal-delay, 0ms);
+  }
+
+  .service-item-grid > [data-scroll-reveal]:nth-child(4n + 2),
+  .about-service-grid > [data-scroll-reveal]:nth-child(4n + 2),
+  .photo-service-grid > [data-scroll-reveal]:nth-child(3n + 2) {
+    --reveal-delay: 70ms;
+  }
+  .service-item-grid > [data-scroll-reveal]:nth-child(4n + 3),
+  .about-service-grid > [data-scroll-reveal]:nth-child(4n + 3),
+  .photo-service-grid > [data-scroll-reveal]:nth-child(3n + 3) {
+    --reveal-delay: 140ms;
+  }
+  .service-item-grid > [data-scroll-reveal]:nth-child(4n + 4),
+  .about-service-grid > [data-scroll-reveal]:nth-child(4n + 4) {
+    --reveal-delay: 210ms;
+  }
+
+  @keyframes reveal-arrive {
+    from {
+      opacity: 0;
+      transform: translateY(28px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

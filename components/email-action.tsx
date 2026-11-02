@@ -122,7 +122,7 @@ export default function EmailAction({
         <aside className="email-story">
           <h1>Akun D’Fable</h1>
           <Image
-            src="/laundry.png"
+            src="/unsplash/folding-web.webp"
             width={1536}
             height={1024}
             alt="Pakaian bersih terlipat rapi"

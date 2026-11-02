@@ -13,6 +13,7 @@ import {
   safeManualSummary,
 } from "./manual-policy";
 import { paymentView, readPaymentOrder, signalPaymentChange } from "./service";
+import { prepareEarn, commitEarn } from "../loyalty";
 import type {
   ManualPaymentRecord,
   ManualPaymentSummary,
@@ -153,7 +154,7 @@ export async function submitManualPayment(
       return;
     available(order);
     const amount = finalAmount(order);
-    if (amount === null)
+    if (amount === null || amount <= 0)
       throw new ApiError(
         409,
         "Tunggu toko mengonfirmasi berat aktual dan ongkir sebelum mengirim bukti pembayaran.",
@@ -251,6 +252,8 @@ export async function reviewManualPayment(
         409,
         "Tagihan berubah atau pembayaran lain aktif. Periksa pesanan sebelum melanjutkan.",
       );
+    const earn =
+      decision === "approve" ? await prepareEarn(tx, database, order) : null;
     const now = new Date().toISOString();
     const summary: ManualPaymentSummary = {
       ...safeManualSummary(record),
@@ -270,6 +273,7 @@ export async function reviewManualPayment(
       manualPayment: summary,
       paymentRevision: (order.paymentRevision || 0) + 1,
       paid: decision === "approve",
+      ...commitEarn(tx, database, order, earn, now),
       updatedAt: now,
     });
     signalPaymentChange(tx, database, order.branchId);
@@ -290,8 +294,7 @@ export async function confirmManualPayment(
       tx.get(orderRef),
       tx.get(recordRef),
     ]);
-    if (!orderSnap.exists)
-      throw new ApiError(404, "Pesanan tidak ditemukan.");
+    if (!orderSnap.exists) throw new ApiError(404, "Pesanan tidak ditemukan.");
     const order = orderSnap.data() as Order;
     const existing = recordSnap.data() as ManualPaymentRecord | undefined;
     if (order.paid && order.manualPayment?.status === "paid") return;
@@ -303,7 +306,7 @@ export async function confirmManualPayment(
         "Selesaikan atau periksa pembayaran QRIS sebelum mengonfirmasi transfer.",
       );
     const amount = finalAmount(order);
-    if (amount === null)
+    if (amount === null || amount <= 0)
       throw new ApiError(
         409,
         "Isi berat aktual dan ongkir sebelum mengonfirmasi pembayaran.",
@@ -312,10 +315,10 @@ export async function confirmManualPayment(
       database.doc(`settings/${order.branchId}`),
     );
     const settings = settingsSnap.get("manualPayment") as
-      | Partial<StoredBankSettings>
-      | undefined;
+      Partial<StoredBankSettings> | undefined;
     const configuredBank = bankDetails(settings, order.branchId);
-    const bank = order.manualPayment?.bank ||
+    const bank =
+      order.manualPayment?.bank ||
       (configuredBank.configured
         ? {
             bankName: configuredBank.bankName,
@@ -332,6 +335,7 @@ export async function confirmManualPayment(
         "Rekening transfer belum diatur untuk cabang pesanan ini.",
       );
 
+    const earn = await prepareEarn(tx, database, order);
     const now = new Date().toISOString();
     const summary = safeManualSummary({
       method: "bank_transfer",
@@ -351,8 +355,7 @@ export async function confirmManualPayment(
       ...existing,
       ...summary,
       orderId,
-      ...(existing?.proofPath &&
-      existing.proofVersion === summary.proofVersion
+      ...(existing?.proofPath && existing.proofVersion === summary.proofVersion
         ? { proofPath: existing.proofPath }
         : {}),
       ...(existing?.rejectedProofVersion
@@ -366,6 +369,7 @@ export async function confirmManualPayment(
       manualPayment: summary,
       paymentRevision: (order.paymentRevision || 0) + 1,
       paid: true,
+      ...commitEarn(tx, database, order, earn, now),
       updatedAt: now,
     });
     signalPaymentChange(tx, database, order.branchId);

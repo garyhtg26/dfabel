@@ -14,9 +14,9 @@ const labels: Record<MediaSlot, string> = {
   promo: "Promo utama",
   people: "Jemput & antar",
   member: "Paket bulanan",
-  wash: "Cuci & kering",
-  complete: "Cuci, kering & setrika",
-  iron: "Setrika saja",
+  wash: "Cuci Kering Lipat",
+  complete: "Cuci Kering Setrika",
+  iron: "Setrika Kiloan",
 };
 export default function ContentEditor({
   store,
@@ -58,8 +58,8 @@ export default function ContentEditor({
   return (
     <section className="content-editor">
       <div className="content-editor-heading">
-        <h2>Gambar website</h2>
-        <p>Gambar yang diunggah langsung tampil di web pelanggan.</p>
+        <h2>Gambar di web pelanggan</h2>
+        <p>Pilih gambar yang ingin ditampilkan untuk setiap bagian.</p>
       </div>
       <div className="media-editor-grid">
         {mediaSlots.map((slot) => (
@@ -121,7 +121,7 @@ export default function ContentEditor({
                 ? "Jemput & antar"
                 : key === "member"
                   ? "Paket bulanan"
-                  : "Tracking"}
+                  : "Lacak pesanan"}
             </legend>
             <label>
               Judul

@@ -102,11 +102,15 @@ test("public tracking excludes customer PII, coordinates, photos, auth UID and t
   ])
     assert.equal(key in output, false);
 });
-test("price changes require four unique valid services and sensible package pricing", () => {
+test("price changes require unique services and valid complete speed rates", () => {
   const prices = [
-    { id: "complete", price: 6000 },
-    { id: "wash", price: 2000 },
-    { id: "iron", price: 4000 },
+    {
+      id: "complete",
+      price: 8000,
+      rates: { regular: 8000, oneDay: 10000, express: 13000, quick: 16000 },
+    },
+    { id: "wash", price: 25000 },
+    { id: "iron", price: 5000 },
     { id: "member", price: 150000 },
   ];
   assert.equal(pricesSchema.safeParse(prices).success, true);
@@ -116,8 +120,15 @@ test("price changes require four unique valid services and sensible package pric
   );
   assert.equal(
     pricesSchema.safeParse(
-      prices.map((p) => (p.id === "complete" ? { ...p, price: 1000 } : p)),
+      prices.map((p) => (p.id === "complete" ? { ...p, price: 999 } : p)),
     ).success,
+    false,
+  );
+  assert.equal(
+    pricesSchema.safeParse([
+      { id: "complete", price: 8000, rates: { regular: 8000 } },
+      ...prices.slice(1),
+    ]).success,
     false,
   );
 });

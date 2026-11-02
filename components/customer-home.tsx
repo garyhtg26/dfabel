@@ -59,6 +59,9 @@ export default function CustomerHome({
     )
     .filter((service) => category === "all" || service.id === category);
   const member = store.services.find((s) => s.id === "member")!;
+  const promoImage = siteImage(content, "promo");
+  const peopleImage = siteImage(content, "people");
+  const memberImage = siteImage(content, "member");
 
   return (
     <div className="customer-experience">
@@ -80,14 +83,16 @@ export default function CustomerHome({
         aria-label="Pilihan D’Fable"
       >
         {store.promo.active && (
-          <article className="campaign-card">
+          <article className="campaign-card" data-scroll-reveal>
             <Image
               width={1536}
               height={1024}
               sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
-              src={siteImage(content, "promo")}
-              unoptimized
-              alt="Mesin cuci putih dan perlengkapan laundry di latar biru"
+              src={promoImage}
+              unoptimized={!promoImage.startsWith("/api/")}
+              fetchPriority="high"
+              loading="eager"
+              alt="Mesin cuci dan perlengkapan laundry"
               className="campaign-photo"
             />
             <div className="campaign-copy">
@@ -105,14 +110,16 @@ export default function CustomerHome({
           </article>
         )}
         {content.people.active && (
-          <article className="people-feature">
+          <article className="people-feature" data-scroll-reveal>
             <Image
               width={1536}
               height={1024}
               sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
-              src={siteImage(content, "people")}
-              unoptimized
-              alt="Petugas laundry merawat cucian di studio putih dan biru"
+              src={peopleImage}
+              unoptimized={!peopleImage.startsWith("/api/")}
+              loading={store.promo.active ? "lazy" : "eager"}
+              fetchPriority={store.promo.active ? "auto" : "high"}
+              alt="Aktivitas mencuci di tempat laundry"
             />
             <div className="people-copy">
               <h2>{content.people.title}</h2>
@@ -125,11 +132,16 @@ export default function CustomerHome({
       </section>
 
       <section className="browse-laundry" aria-label="Pilih layanan">
-        <div className="browse-heading">
+        <div className="browse-heading" data-scroll-reveal>
           <h2>Layanan</h2>
           <button onClick={onServices}>Daftar harga</button>
         </div>
-        <div className="category-row" role="group" aria-label="Filter layanan">
+        <div
+          className="category-row"
+          role="group"
+          aria-label="Filter layanan"
+          data-scroll-reveal
+        >
           {categories
             .filter((c) => c.id !== "member" || content.member.active)
             .map(({ id, label, icon: Icon }) => (
@@ -151,6 +163,7 @@ export default function CustomerHome({
             <button
               key={s.id}
               className={`photo-service service-${s.id}`}
+              data-scroll-reveal
               onClick={() => onOrder(s.id)}
             >
               <div className="photo-service-image">
@@ -159,13 +172,18 @@ export default function CustomerHome({
                   height={1024}
                   sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
                   src={siteImage(content, s.id as "wash" | "iron" | "complete")}
-                  unoptimized
+                  unoptimized={
+                    !siteImage(
+                      content,
+                      s.id as "wash" | "iron" | "complete",
+                    ).startsWith("/api/")
+                  }
                   alt={
                     s.id === "wash"
-                      ? "Perawatan cucian di studio"
+                      ? "Deretan pakaian bersih"
                       : s.id === "iron"
-                        ? "Menyetrika kemeja dengan teliti"
-                        : "Pakaian bersih terlipat rapi"
+                        ? "Proses menyetrika pakaian"
+                        : "Tumpukan pakaian bersih di laundry"
                   }
                 />
                 <span className="photo-service-tag">
@@ -173,7 +191,7 @@ export default function CustomerHome({
                     ? "Favorit"
                     : s.id === "wash"
                       ? "Paket hemat"
-                      : "Rapi lagi"}
+                      : "Setrika"}
                 </span>
                 <span className="photo-service-add">
                   <Plus size={20} />
@@ -182,9 +200,7 @@ export default function CustomerHome({
               <div className="photo-service-info">
                 <h3>{s.name}</h3>
                 <div>
-                  <strong>
-                    {money(s.price)}
-                  </strong>
+                  <strong>{money(s.price)}</strong>
                   <small>
                     / {s.packageSize ? `${s.packageSize} kg` : s.unit}
                   </small>
@@ -202,6 +218,7 @@ export default function CustomerHome({
           {category === "member" && content.member.active && (
             <button
               className="photo-service membership-feature"
+              data-scroll-reveal
               onClick={onMember}
             >
               <div className="photo-service-image">
@@ -209,8 +226,8 @@ export default function CustomerHome({
                   width={1536}
                   height={1024}
                   sizes="(max-width: 520px) 100vw, (max-width: 900px) 50vw, 700px"
-                  unoptimized
-                  src={siteImage(content, "member")}
+                  unoptimized={!memberImage.startsWith("/api/")}
+                  src={memberImage}
                   alt="Paket bulanan"
                 />
                 <span className="photo-service-tag">Paket bulanan</span>
@@ -241,7 +258,7 @@ export default function CustomerHome({
         </p>
       </section>
 
-      <div className="customer-bottom-grid">
+      <div className="customer-bottom-grid" data-scroll-reveal>
         {content.tracking.active && (
           <section className="tracking-ribbon">
             <span className="ribbon-icon">
@@ -275,9 +292,10 @@ export default function CustomerHome({
             <Image
               width={120}
               height={120}
-              unoptimized
+              sizes="80px"
+              unoptimized={!memberImage.startsWith("/api/")}
               className="monthly-thumb"
-              src={siteImage(content, "member")}
+              src={memberImage}
               alt="Paket bulanan"
             />
             <div className="monthly-copy">

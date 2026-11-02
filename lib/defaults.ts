@@ -133,8 +133,8 @@ export const defaultStore: Store = {
   services: catalogServices,
   orders: [],
   promo: {
-    title: "Cucian numpuk? Beresin, yuk.",
-    description: "Cuci kering lipat mulai Rp25.000 / 10 kg.",
+    title: "Cucian menumpuk? Kami bantu.",
+    description: "Cuci kering lipat · 10 kg",
     code: "HELLODFABLE",
     active: true,
   },

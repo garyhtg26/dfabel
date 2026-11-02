@@ -1,0 +1,105 @@
+.story-photos {
+  width: 100%;
+  max-width: 540px;
+  margin: 0 auto;
+}
+.story-photos-canvas {
+  position: relative;
+  isolation: isolate;
+  height: clamp(330px, 76vw, 435px);
+}
+.story-photos-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 16% 12% 10%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse,
+    #e2e8ff 0%,
+    #f5f7ff 55%,
+    transparent 75%
+  );
+}
+.story-photo {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  width: 55%;
+  height: 80%;
+  min-width: 0;
+  padding: 8px 8px 0;
+  border: 1px solid #e9ebf1;
+  border-radius: 19px;
+  background: #fff;
+  box-shadow: 0 18px 45px #20275c2b;
+  text-align: left;
+  transform-origin: 50% 90%;
+  transition:
+    transform 500ms cubic-bezier(0.2, 0.75, 0.2, 1),
+    box-shadow 250ms ease;
+}
+.story-photo-0 {
+  z-index: 3;
+  transform: translateX(-50%) rotate(-2deg);
+}
+.story-photo-1 {
+  z-index: 2;
+  transform: translateX(-86%) rotate(-13deg) scale(0.94);
+}
+.story-photo-2 {
+  z-index: 1;
+  transform: translateX(-14%) rotate(12deg) scale(0.94);
+}
+.story-photo-0:hover {
+  transform: translateX(-50%) rotate(0deg) translateY(-8px);
+  box-shadow: 0 26px 55px #20275c38;
+}
+.story-photo-1:hover {
+  transform: translateX(-88%) rotate(-15deg) translateY(-8px) scale(0.94);
+}
+.story-photo-2:hover {
+  transform: translateX(-12%) rotate(14deg) translateY(-8px) scale(0.94);
+}
+.story-photo:focus-visible {
+  outline-offset: 4px;
+}
+.story-photo-image {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #edf0f8;
+}
+.story-photo-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 48px;
+  padding: 8px 5px;
+  color: #343a52;
+  font-size: 11px;
+  font-weight: 650;
+}
+.story-photo-caption svg {
+  color: #302bd7;
+  flex-shrink: 0;
+}
+.story-photo-hint {
+  margin: 0;
+  color: #838a9b;
+  text-align: center;
+  font-size: 12px;
+}
+.story-photo-hint span {
+  padding: 0 5px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .story-photo {
+    transition: none;
+  }
+}

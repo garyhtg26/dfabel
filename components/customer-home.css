@@ -203,6 +203,38 @@
 .people-copy button:hover {
   background: #ffffff40;
 }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .campaign-card,
+  .people-feature {
+    transition: box-shadow 350ms ease;
+  }
+  .campaign-photo,
+  .people-feature > img {
+    transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .campaign-copy button,
+  .people-copy button {
+    transition:
+      background-color 250ms ease,
+      box-shadow 250ms ease;
+  }
+  .campaign-copy button svg,
+  .people-copy button svg {
+    transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .campaign-card:is(:hover, :focus-within),
+  .people-feature:is(:hover, :focus-within) {
+    box-shadow: 0 18px 38px #20246b26;
+  }
+  .campaign-card:is(:hover, :focus-within) .campaign-photo,
+  .people-feature:is(:hover, :focus-within) > img {
+    transform: scale(1.045);
+  }
+  .campaign-card:is(:hover, :focus-within) .campaign-copy button svg,
+  .people-feature:is(:hover, :focus-within) .people-copy button svg {
+    transform: translateX(3px);
+  }
+}
 .no-campaign {
   grid-template-columns: 1fr;
 }

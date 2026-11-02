@@ -1,10 +1,6 @@
 export type ServiceSpeed = "regular" | "oneDay" | "express" | "quick";
 export type ServiceCategory =
-  | "daily"
-  | "household"
-  | "premium"
-  | "additional"
-  | "member";
+  "daily" | "household" | "premium" | "additional" | "member";
 export type Service = {
   id: string;
   name: string;
@@ -49,6 +45,8 @@ export type Order = {
   paymentRevision?: number;
   shippingFee: number | null;
   total: number;
+  pointsUsed?: number;
+  pointsEarned?: number;
   unitPrice: number;
   washPrice: number;
   source: "web" | "pos";
@@ -95,6 +93,8 @@ export type TrackingOrder = Pick<
   | "manualPayment"
   | "branchId"
   | "total"
+  | "pointsUsed"
+  | "pointsEarned"
   | "shippingFee"
   | "date"
   | "slot"

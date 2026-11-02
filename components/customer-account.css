@@ -1,0 +1,60 @@
+.customer-account {
+  position: relative;
+}
+.customer-account-trigger {
+  min-height: 44px;
+}
+.customer-account-menu {
+  position: absolute;
+  z-index: 1000;
+  right: 0;
+  top: calc(100% + 12px);
+  width: 240px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #e6e8f0;
+  border-radius: 14px;
+  box-shadow: 0 16px 44px #161c3926;
+}
+.customer-account-name {
+  padding: 11px 12px;
+  border-bottom: 1px solid #eff0f5;
+  margin-bottom: 5px;
+}
+.customer-account-name strong,
+.customer-account-name small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.customer-account-name strong {
+  font-size: 13px;
+}
+.customer-account-name small {
+  margin-top: 3px;
+  color: #8b90a0;
+  font-size: 11px;
+}
+.customer-account-menu a,
+.customer-account-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 8px;
+  color: #41485b;
+  text-align: left;
+  font-size: 13px;
+}
+.customer-account-menu a:hover,
+.customer-account-menu button:hover {
+  background: #f3f3ff;
+  color: #2621da;
+}
+.customer-account-menu p {
+  margin: 5px 12px;
+  color: #b42318;
+  font-size: 12px;
+}

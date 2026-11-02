@@ -77,43 +77,50 @@ function AddressSearch({
 export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState("");
+  const [useFallback, setUseFallback] = useState(false);
   const callback = useRef(onChange);
   callback.current = onChange;
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const marker = useRef<import("leaflet").CircleMarker | null>(null);
   const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const googleMapId = process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID;
+  const useGoogle = Boolean(key) && !useFallback;
   useEffect(() => {
-    if (key || !ref.current) return;
+    if (useGoogle || !ref.current) return;
     let disposed = false;
-    import("leaflet").then((L) => {
-      if (disposed || !ref.current) return;
-      const map = L.map(ref.current).setView([lat, lng], 14);
-      mapRef.current = map;
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
+    import("leaflet")
+      .then((L) => {
+        if (disposed || !ref.current) return;
+        const map = L.map(ref.current).setView([lat, lng], 14);
+        mapRef.current = map;
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: 19,
+        })
+          .addTo(map)
+          .on("tileerror", () =>
+            setError("Peta gagal dimuat. Periksa koneksi internet."),
+          );
+        marker.current = L.circleMarker([lat, lng], {
+          radius: 10,
+          color: "#fff",
+          weight: 3,
+          fillColor: "#2621df",
+          fillOpacity: 1,
+        }).addTo(map);
+        map.on("click", (e) => callback.current(e.latlng.lat, e.latlng.lng));
       })
-        .addTo(map)
-        .on("tileerror", () =>
-          setError("Peta gagal dimuat. Periksa koneksi internet."),
-        );
-      marker.current = L.circleMarker([lat, lng], {
-        radius: 10,
-        color: "#fff",
-        weight: 3,
-        fillColor: "#2621df",
-        fillOpacity: 1,
-      }).addTo(map);
-      map.on("click", (e) => callback.current(e.latlng.lat, e.latlng.lng));
-    });
+      .catch(() => {
+        if (!disposed)
+          setError("Peta belum bisa dimuat. Periksa koneksi lalu coba lagi.");
+      });
     return () => {
       disposed = true;
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [key]);
+  }, [useGoogle]);
   useEffect(() => {
     marker.current?.setLatLng([lat, lng]);
     mapRef.current?.panTo([lat, lng]);
@@ -132,7 +139,8 @@ export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
             onChange(p.coords.latitude, p.coords.longitude);
             setError("");
           },
-          () => setError("Izin lokasi ditolak. Pilih titik di peta."),
+          () => setError("Lokasi belum tersedia. Pilih titik di peta."),
+          { timeout: 10000, maximumAge: 60000 },
         );
       }}
     >
@@ -141,16 +149,17 @@ export default function MapPicker({ lat, lng, onChange, onAddress }: Props) {
   );
   return (
     <section>
-      {key ? (
+      {useGoogle && key ? (
         <APIProvider
           apiKey={key}
           language="id"
           region="ID"
-          onError={() =>
+          onError={() => {
             setError(
-              "Google Maps gagal dimuat. Periksa API key, billing, dan domain yang diizinkan.",
-            )
-          }
+              "Google Maps belum tersedia. Gunakan peta alternatif untuk memilih titik.",
+            );
+            setUseFallback(true);
+          }}
         >
           <AddressSearch onChange={onChange} onAddress={onAddress} />
           <div className="relative h-60 overflow-hidden rounded-xl bg-slate-100">

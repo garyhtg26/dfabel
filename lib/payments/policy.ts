@@ -26,9 +26,13 @@ export function finalAmount(order: Order): number | null {
     order.shippingFee < 0
   )
     return null;
-  const expected = calculateOrderPrice(order, order.actualKg) + order.shippingFee;
+  const service = calculateOrderPrice(order, order.actualKg);
+  const discount = order.pointsUsed || 0;
+  if (!Number.isSafeInteger(discount) || discount < 0 || discount > service)
+    return null;
+  const expected = service - discount + order.shippingFee;
   return Number.isSafeInteger(expected) &&
-    expected > 0 &&
+    expected >= 0 &&
     expected <= 10_000_000 &&
     expected === order.total
     ? expected

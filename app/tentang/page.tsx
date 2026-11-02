@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import AboutHeader from "@/components/about-header";
+import StoryPhotoStack from "@/components/story-photo-stack";
+import ScrollReveal from "@/components/scroll-reveal";
 import {
   LayoutDashboard,
   MessageCircle,
@@ -55,28 +58,8 @@ function Brand() {
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white">
-      <header className="customer-header">
-        <Brand />
-        <nav>
-          <Link href="/?view=home">Beranda</Link>
-          <Link href="/?view=services">Layanan & harga</Link>
-          <Link href="/?view=tracking">Lacak pesanan</Link>
-          <Link className="active" href="/tentang">
-            Tentang D’Fable
-          </Link>
-        </nav>
-        <div className="header-right">
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
-          >
-            <MessageCircle size={18} />
-            <span className="hidden sm:inline">WhatsApp</span>
-          </a>
-        </div>
-      </header>
+      <AboutHeader />
+      <ScrollReveal />
 
       <main className="mx-auto max-w-[1296px] px-5 pb-20 pt-8 sm:px-8 lg:px-12 lg:pb-16 lg:pt-10 xl:px-0">
         <section className="grid grid-cols-[minmax(0,1fr)] overflow-hidden rounded-[26px] bg-[#1023a7] shadow-[0_24px_70px_rgba(23,31,111,0.16)] lg:min-h-[520px] lg:grid-cols-[0.78fr_1.22fr]">
@@ -85,11 +68,11 @@ export default function AboutPage() {
               TENTANG D’FABLE
             </span>
             <h1 className="max-w-[520px] text-[38px] leading-[1.08] tracking-[-0.055em] text-white sm:text-[48px] lg:text-[52px]">
-              Satu tempat untuk semua cara mencuci.
+              Cucian bersih, dengan cara yang kamu pilih.
             </h1>
             <p className="mt-5 max-w-[500px] text-sm leading-7 text-blue-100 sm:text-[15px]">
-              D’Fable mengusung konsep Hybrid Laundry Studio agar pelanggan
-              bebas memilih cara yang paling nyaman untuk merawat cucian.
+              Mau cuci sendiri, titip di toko, atau dijemput dari rumah?
+              Semuanya bisa di D’Fable.
             </p>
             <a
               href={whatsappUrl}
@@ -113,35 +96,44 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="grid gap-8 py-16 lg:grid-cols-[0.78fr_1.22fr] lg:gap-20 lg:py-24">
-          <div>
+        <section
+          data-scroll-reveal
+          className="grid items-center gap-10 py-16 lg:grid-cols-[1fr_1fr] lg:gap-20 lg:py-24"
+        >
+          <StoryPhotoStack />
+          <div className="max-w-[600px]">
             <span className="mb-4 block text-[10px] font-bold tracking-[0.18em] text-indigo-600">
               CERITA D’FABLE
             </span>
-            <h2 className="max-w-[460px] text-[32px] leading-tight sm:text-[40px]">
-              Laundry yang mengikuti cara kamu.
+            <h2 className="max-w-[500px] text-[32px] leading-tight sm:text-[40px]">
+              Tumbuh bersama, dari Cinere.
             </h2>
-          </div>
-          <div className="max-w-[710px] space-y-5 text-[15px] leading-8 text-slate-600 sm:text-base">
-            <p>
-              D’Fable berawal dari keinginan menghadirkan pengalaman laundry
-              yang lebih mudah, jelas, dan fleksibel. Dari kebutuhan itu lahir
-              satu studio dengan beberapa pilihan layanan dalam satu tempat.
-            </p>
-            <p>
-              Pelanggan dapat mencuci sendiri, menitipkan cucian kepada tim,
-              memilih perawatan lengkap, atau menggunakan layanan jemput dan
-              antar. Pengalaman yang sama kemudian dibawa ke web agar layanan,
-              pemesanan, dan proses cucian lebih mudah diakses.
-            </p>
-            <div className="inline-flex rounded-full bg-indigo-50 px-4 py-2 text-xs font-bold tracking-[0.12em] text-indigo-700">
-              BERSIH · RAPI · BERDAYA
+            <div className="space-y-5 text-[15px] leading-8 text-slate-600 sm:text-base">
+              <p>
+                D’Fable berdiri pada 2026, dimulai dari cabang pertama kami di
+                Cinere, Karang Tengah.
+              </p>
+              <p>
+                Kami ingin menjadi tempat laundry yang dekat dengan keseharian
+                pelanggan, sekaligus membuka kesempatan bagi penyandang
+                disabilitas untuk berkarya dan berkembang bersama.
+              </p>
+              <p>
+                Setiap cucian yang kamu percayakan ikut menjadi bagian dari
+                cerita itu.
+              </p>
             </div>
+            <span className="mt-6 inline-flex rounded-full bg-indigo-50 px-4 py-2 text-xs font-bold tracking-[0.12em] text-indigo-700">
+              BERSIH · RAPI · BERDAYA
+            </span>
           </div>
         </section>
 
         <section className="rounded-[24px] border border-slate-200 bg-slate-50 p-6 sm:p-9 lg:p-11">
-          <div className="mb-8 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+          <div
+            data-scroll-reveal
+            className="mb-8 flex flex-col justify-between gap-3 sm:flex-row sm:items-end"
+          >
             <div>
               <span className="mb-3 block text-[10px] font-bold tracking-[0.18em] text-indigo-600">
                 HYBRID LAUNDRY
@@ -154,10 +146,11 @@ export default function AboutPage() {
               Datang ke gerai atau jadwalkan penjemputan dari rumah.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="about-service-grid grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {services.map(({ title, text, icon: Icon }) => (
               <article
                 key={title}
+                data-scroll-reveal
                 className="rounded-2xl border border-slate-200 bg-white p-5 transition hover:-translate-y-1 hover:border-indigo-200 hover:shadow-[0_14px_35px_rgba(30,41,99,0.09)]"
               >
                 <span className="mb-6 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
@@ -170,7 +163,10 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="mt-8 overflow-hidden rounded-[24px] bg-[linear-gradient(120deg,#1712a0_0%,#2621da_58%,#3b82f6_130%)] p-7 text-white sm:p-10 lg:flex lg:items-center lg:justify-between lg:gap-12 lg:p-12">
+        <section
+          data-scroll-reveal
+          className="mt-8 overflow-hidden rounded-[24px] bg-[linear-gradient(120deg,#1712a0_0%,#2621da_58%,#3b82f6_130%)] p-7 text-white sm:p-10 lg:flex lg:items-center lg:justify-between lg:gap-12 lg:p-12"
+        >
           <div>
             <span className="mb-4 block text-[10px] font-bold tracking-[0.18em] text-blue-200">
               HUBUNGI KAMI
@@ -179,8 +175,8 @@ export default function AboutPage() {
               Ada yang ingin ditanyakan?
             </h2>
             <p className="mb-0 max-w-[600px] text-sm leading-7 text-blue-100">
-              Tim D’Fable siap membantu informasi layanan, pesanan, dan
-              penjemputan cucian.
+              Tanya kami soal layanan, pesanan, atau jadwal jemput lewat
+              WhatsApp.
             </p>
           </div>
           <div className="mt-8 shrink-0 lg:mt-0 lg:text-right">

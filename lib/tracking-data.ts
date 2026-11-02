@@ -36,6 +36,8 @@ export function publicTracking(o: Order): TrackingOrder {
       : {}),
     branchId: o.branchId,
     total: o.total,
+    ...(o.pointsUsed ? { pointsUsed: o.pointsUsed } : {}),
+    ...(o.pointsEarned ? { pointsEarned: o.pointsEarned } : {}),
     shippingFee: o.shippingFee,
     date: o.date,
     slot: o.slot,

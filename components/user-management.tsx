@@ -69,7 +69,7 @@ export default function UserManagement() {
       <div className="users-toolbar">
         <div>
           <h2>Tim & pelanggan</h2>
-          <p>Atur siapa yang dapat mengakses workspace.</p>
+          <p>Kelola akun pelanggan dan akses tim toko.</p>
         </div>
         <button className="primary" onClick={() => setAdding(!adding)}>
           <Plus size={17} /> Tambah pengguna
@@ -83,7 +83,7 @@ export default function UserManagement() {
           <b>Staf</b> Pesanan dan POS
         </span>
         <span>
-          <b>Customer</b> Pesanan pribadi
+          <b>Pelanggan</b> Pesanan pribadi
         </span>
       </div>
       {adding && (
@@ -128,15 +128,15 @@ export default function UserManagement() {
             <label>
               Akses
               <select name="role" defaultValue="staff">
-                <option value="customer">Customer</option>
+                <option value="customer">Pelanggan</option>
                 <option value="staff">Staf</option>
                 <option value="admin">Admin</option>
               </select>
             </label>
           </div>
           <p className="muted">
-            Pengguna perlu memverifikasi email saat login pertama. Password
-            tidak ditampilkan lagi setelah disimpan.
+            Pengguna perlu memverifikasi email saat pertama kali masuk. Password
+            tidak bisa dilihat lagi setelah disimpan.
           </p>
           <button disabled={busy} className="primary">
             Buat pengguna
@@ -158,8 +158,7 @@ export default function UserManagement() {
           <div>
             <b>Hapus akun {pending.email}?</b>
             <p>
-              Login akun dihapus permanen. Riwayat transaksi toko tetap
-              tersimpan.
+              Akun ini akan dihapus permanen. Riwayat transaksi tetap tersimpan.
             </p>
           </div>
           <button disabled={busy} onClick={() => setPending(null)}>
@@ -209,7 +208,7 @@ export default function UserManagement() {
           disabled={busy}
           onClick={() => load(cursor)}
         >
-          Muat pengguna berikutnya
+          Lihat pengguna lainnya
         </button>
       )}
     </section>
@@ -255,7 +254,7 @@ function UserRow({
           </small>
         )}
         <small>
-          {row.verified ? "Email terverifikasi" : "Belum verifikasi"} ·{" "}
+          {row.verified ? "Email terverifikasi" : "Email belum diverifikasi"} ·{" "}
           {row.disabled ? "Nonaktif" : "Aktif"}
         </small>
       </div>
@@ -268,7 +267,7 @@ function UserRow({
             onChange={(e) => setRole(e.target.value)}
           >
             {row.role === "owner" && <option value="owner">Pemilik</option>}
-            <option value="customer">Customer</option>
+            <option value="customer">Pelanggan</option>
             <option value="staff">Staf</option>
             <option value="admin">Admin</option>
           </select>

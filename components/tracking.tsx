@@ -16,6 +16,7 @@ import { money, statuses, type TrackingOrder, type Service } from "@/lib/types";
 import { branches, isBranchId } from "@/lib/branches";
 import { speedLabel, unitLabel } from "@/lib/catalog";
 import PaymentPanel from "./payment-panel";
+import LoyaltyRedemption from "./loyalty-redemption";
 export const previewTracking: TrackingOrder = {
   id: "DF-CONTOH",
   branchId: "cinere",
@@ -45,6 +46,7 @@ export default function Tracking({
   trackingToken,
   paymentEnabled,
   onOrderChanged,
+  isOwner = false,
 }: {
   order: TrackingOrder;
   services: Service[];
@@ -52,6 +54,7 @@ export default function Tracking({
   trackingToken?: string;
   paymentEnabled?: boolean;
   onOrderChanged?: () => void;
+  isOwner?: boolean;
 }) {
   const stage = o.status < 3 ? 0 : o.status < 6 ? 1 : o.status === 6 ? 2 : 3;
   const phases = [
@@ -80,27 +83,27 @@ export default function Tracking({
               <h2 className="!mb-3 !text-[30px] !leading-tight tracking-tight sm:!text-4xl">
                 {stage === 3 ? (
                   <>
-                    Sudah kembali.
+                    Pesanan selesai.
                     <br />
-                    Bersih & rapi.
+                    Terima kasih!
                   </>
                 ) : stage === 2 ? (
                   <>
-                    Cucian bersihmu
+                    Cucianmu
                     <br />
                     sedang diantar.
                   </>
                 ) : stage === 1 ? (
                   <>
-                    Sedang dirawat.
+                    Cucianmu sedang
                     <br />
-                    Sebentar lagi rapi.
+                    kami proses.
                   </>
                 ) : (
                   <>
-                    Perjalanan bersih
+                    Pesananmu
                     <br />
-                    dimulai di sini.
+                    sudah kami terima.
                   </>
                 )}
               </h2>
@@ -150,12 +153,10 @@ export default function Tracking({
             <Clock size={20} className="shrink-0 text-indigo-200" />
             <div>
               <b className="block text-sm font-medium">
-                {stage === 3
-                  ? "Pesanan selesai"
-                  : "Kami kabari setiap tahapnya."}
+                {stage === 3 ? "Pesanan selesai" : "Pantau pesanan di sini"}
               </b>
               <span className="text-xs text-indigo-200">
-                Status diperbarui toko, bukan lokasi GPS langsung.
+                Status diperbarui oleh toko. Posisi kurir tidak ditampilkan.
               </span>
             </div>
           </div>
@@ -211,6 +212,9 @@ export default function Tracking({
               </span>
             </div>
           </div>
+          {isOwner && !preview && (
+            <LoyaltyRedemption order={o} onChanged={onOrderChanged} />
+          )}
           <div className="mb-5 flex items-center justify-between">
             <span className="text-sm text-slate-500">
               {o.actualKg === null || o.shippingFee === null
@@ -227,7 +231,7 @@ export default function Tracking({
             </div>
           ) : (
             <PaymentPanel
-              key={o.id}
+              key={`${o.id}-${o.pointsUsed || 0}-${o.paid}`}
               orderId={o.id}
               trackingToken={trackingToken}
               enabled={paymentEnabled}
@@ -242,7 +246,7 @@ export default function Tracking({
         </section>
       </div>
       <section className="border-t border-slate-100 p-6 sm:p-8">
-        <h3 className="!mb-6 !text-base">Perjalanan cucianmu</h3>
+        <h3 className="!mb-6 !text-base">Riwayat pesanan</h3>
         <ol className="grid list-none gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {o.history
             .slice()

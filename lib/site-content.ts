@@ -10,12 +10,12 @@ export const mediaSlots = [
 export type MediaSlot = (typeof mediaSlots)[number];
 export const mediaSlotSchema = z.enum(mediaSlots);
 export const defaultImages: Record<MediaSlot, string> = {
-  promo: "/promo-washer-v2.png",
-  people: "/unsplash/people.jpg",
-  member: "/laundry.png",
-  wash: "/unsplash/shirt.jpg",
-  complete: "/laundry.png",
-  iron: "/laundry-ironing-v3.png",
+  promo: "/promo-washer-optimized.webp",
+  people: "/unsplash/laundry-people-web.webp",
+  member: "/unsplash/folding-web.webp",
+  wash: "/shirt-optimized.webp",
+  complete: "/unsplash/clean-web.webp",
+  iron: "/unsplash/ironing-web.webp",
 };
 const banner = z
   .object({

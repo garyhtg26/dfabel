@@ -4208,6 +4208,9 @@ input[type="checkbox"] {
   display: block !important;
   margin: 0 !important;
 }
+.price-editor-speed-label {
+  display: none;
+}
 .price-editor-input input {
   width: 100%;
   min-width: 0;
@@ -4347,6 +4350,11 @@ input[type="checkbox"] {
 .admin-two {
   grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
 }
+@media (max-width: 1100px) {
+  .admin-two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .order-dialog {
   width: min(620px, calc(100vw - 24px));
   max-height: calc(100dvh - 24px);
@@ -4396,7 +4404,6 @@ input[type="checkbox"] {
 }
 .speed-choice button > small {
   grid-area: duration;
-  grid-column: auto;
   min-width: 0;
   line-height: 1.3;
 }
@@ -4448,5 +4455,113 @@ input[type="checkbox"] {
   .form-summary > div:last-child > button {
     flex: 1 1 0;
     min-width: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .price-editor-group {
+    margin-right: 0;
+    overflow: visible;
+  }
+  .price-editor-speed-head {
+    display: none;
+  }
+  .price-editor-row {
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 14px 0;
+  }
+  .price-editor-name {
+    grid-column: 1 / -1;
+  }
+  .price-editor-speed-label {
+    display: block;
+    margin-bottom: 5px;
+    color: #747b90;
+    font-size: 11px;
+  }
+  .price-editor-group:not([data-matrix="true"]) .price-editor-single {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    width: 100%;
+  }
+  .price-editor-input input {
+    text-align: left;
+  }
+  .daily-rate-table {
+    min-width: 0;
+    display: block;
+    white-space: normal;
+  }
+  .daily-rate-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .daily-rate-table tbody {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+  }
+  .daily-rate-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid #edf0f6;
+    border-radius: 12px;
+  }
+  .daily-rate-table tbody th {
+    grid-column: 1 / -1;
+    background: #f8f9fe;
+  }
+  .daily-rate-table tbody td {
+    text-align: left;
+    white-space: normal;
+  }
+  .daily-rate-table tbody td:nth-child(odd) {
+    border-right: 0;
+  }
+  .daily-rate-table tbody td:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+  .daily-rate-table tbody td::before {
+    display: block;
+    margin-bottom: 4px;
+    color: #737b90;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .daily-rate-table tbody td:nth-child(2)::before {
+    content: "Reguler · 3 hari";
+  }
+  .daily-rate-table tbody td:nth-child(3)::before {
+    content: "One Day · 1 hari";
+  }
+  .daily-rate-table tbody td:nth-child(4)::before {
+    content: "Express · 6–8 jam";
+  }
+  .daily-rate-table tbody td:nth-child(5)::before {
+    content: "Quick · 3 jam";
+  }
+  .service-item-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .service-item-card > strong {
+    grid-column: 2;
+  }
+  .service-item-card > svg:last-child {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+  .service-item-copy b {
+    overflow: visible;
+    overflow-wrap: anywhere;
   }
 }

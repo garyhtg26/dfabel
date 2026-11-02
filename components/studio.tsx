@@ -3,6 +3,8 @@ import { useState, useEffect, useRef, type FormEvent } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import CustomerHome from "./customer-home";
+import CustomerAccount from "./customer-account";
+import ScrollReveal from "./scroll-reveal";
 import { useAuth } from "./auth-provider";
 import AccountPanel from "./account-panel";
 import UserManagement from "./user-management";
@@ -199,6 +201,15 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   const [query, setQuery] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const sessionKey = `${auth.scope}:${auth.user?.uid || "guest"}:${auth.verified}:${auth.provider}:${branch}`;
+  const dialogAvailable = Boolean(
+    store &&
+    loadedSession === sessionKey &&
+    (!dashboard ||
+      (!auth.loading &&
+        store.isAdmin &&
+        auth.provider === "password" &&
+        auth.verified)),
+  );
   const activeSession = useRef(sessionKey);
   activeSession.current = sessionKey;
   const loadSequence = useRef(0);
@@ -306,6 +317,13 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
         : previous,
     );
     load();
+    const interval = setInterval(load, 15000);
+    return () => {
+      clearInterval(interval);
+      storeLoadController.current?.abort();
+    };
+  }, [auth.user?.uid, auth.verified, auth.provider, branch]);
+  useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get("account") === "1" && !dashboard) setModal("login");
     const requestedView = params.get("view");
@@ -320,12 +338,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
       setTrack(q);
       setView("tracking");
     }
-    const interval = setInterval(load, 15000);
-    return () => {
-      clearInterval(interval);
-      storeLoadController.current?.abort();
-    };
-  }, [auth.user?.uid, auth.verified, auth.provider, branch]);
+  }, [dashboard]);
   useEffect(() => {
     setPublicOrder(null);
     setTrackingError("");
@@ -356,15 +369,16 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
     window.scrollTo({ top: 0 });
   }, [view, adminView]);
   useEffect(() => {
+    const element = dialog.current;
+    if (!dialogAvailable || !modal || !element) return;
     const previousOverflow = document.body.style.overflow;
-    if (modal) {
-      dialog.current?.showModal();
-      document.body.style.overflow = "hidden";
-    } else dialog.current?.close();
+    if (!element.open) element.showModal();
+    document.body.style.overflow = "hidden";
     return () => {
+      if (element.open) element.close();
       document.body.style.overflow = previousOverflow;
     };
-  }, [modal]);
+  }, [modal, dialogAvailable]);
   useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(""), 4500);
@@ -470,6 +484,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
   ).length;
   return (
     <>
+      <ScrollReveal />
       {dashboard ? (
         <div className="admin-shell">
           <aside className="sidebar">
@@ -622,7 +637,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                       </span>
                     </button>
                   )}
-                  <div className="metrics">
+                  <div className="metrics" data-scroll-reveal>
                     {[
                       [Wallet, "Penjualan terbayar", money(revenue)],
                       [ShoppingBag, "Total pesanan", orders.length],
@@ -654,7 +669,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                       );
                     })}
                   </div>
-                  <div className="admin-two">
+                  <div className="admin-two" data-scroll-reveal>
                     <section className="panel">
                       <div className="section-heading">
                         <h3>Alur operasional</h3>
@@ -712,7 +727,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                 </>
               )}
               {(adminView === "overview" || adminView === "orders") && (
-                <section className="panel orders-panel">
+                <section className="panel orders-panel" data-scroll-reveal>
                   <div className="section-heading">
                     <h3>
                       {adminView === "overview"
@@ -842,7 +857,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                 </section>
               )}
               {adminView === "pos" && (
-                <div className="pos-layout">
+                <div className="pos-layout" data-scroll-reveal>
                   <section className="panel">
                     <p className="eyebrow">LAYANAN TOKO</p>
                     <h2>Pelanggan datang langsung?</h2>
@@ -939,7 +954,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                 />
               )}
               {adminView === "promo" && (
-                <div className="banner-settings">
+                <div className="banner-settings" data-scroll-reveal>
                   <PromoEditor
                     store={store}
                     save={async (data) => {
@@ -985,20 +1000,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   <option value="bogor">Cibubur</option>
                 </select>
               </label>
-              <button
-                className="account-button"
-                aria-label="Buka profil pelanggan"
-                onClick={() => setModal("login")}
-              >
-                <User size={18} />
-                <span>
-                  {auth.loading
-                    ? "Memuat…"
-                    : auth.user
-                      ? auth.name || "Akun saya"
-                      : "Masuk"}
-                </span>
-              </button>
+              <CustomerAccount onLogin={() => setModal("login")} />
             </div>
           </header>
           <main className="customer-main">
@@ -1012,13 +1014,17 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   if (code) setTrack(code);
                   setView("tracking");
                 }}
-                onAccount={() => setModal("login")}
+                onAccount={() =>
+                  auth.user && auth.verified
+                    ? window.location.assign("/profil")
+                    : setModal("login")
+                }
                 onServices={() => setView("services")}
               />
             )}
             {view === "services" && (
               <section className="services-section">
-                <div className="section-heading">
+                <div className="section-heading" data-scroll-reveal>
                   <div>
                     <h2>Layanan & harga</h2>
                   </div>
@@ -1032,7 +1038,11 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                     if (!group.length) return null;
                     if (category === "daily")
                       return (
-                        <section className="daily-rate-section" key={category}>
+                        <section
+                          className="daily-rate-section"
+                          key={category}
+                          data-scroll-reveal
+                        >
                           <div className="service-catalog-heading">
                             <div>
                               <h3>{serviceCategoryLabels[category]}</h3>
@@ -1091,7 +1101,10 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                       );
                     return (
                       <section className="service-catalog-group" key={category}>
-                        <div className="service-catalog-heading">
+                        <div
+                          className="service-catalog-heading"
+                          data-scroll-reveal
+                        >
                           <h3>{serviceCategoryLabels[category]}</h3>
                           {category === "member" && (
                             <span>Paket 30 kg · berlaku 30 hari</span>
@@ -1103,6 +1116,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                               type="button"
                               className="service-item-card"
                               key={item.id}
+                              data-scroll-reveal
                               onClick={() =>
                                 item.category === "member"
                                   ? setModal("member")
@@ -1133,17 +1147,17 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                     );
                   })}
                 </div>
-                <div className="pricing-note">
+                <div className="pricing-note" data-scroll-reveal>
                   <Info size={16} />
                   <span>
-                    Satu mesin hanya untuk satu pelanggan. Pisahkan cucian
-                    sesuai catatan perawatan. Ongkir dikonfirmasi toko.
+                    Cucian setiap pelanggan diproses di mesin terpisah. Ongkir
+                    akan dikonfirmasi oleh toko.
                   </span>
                 </div>
               </section>
             )}
             {view === "tracking" && (
-              <section className="tracking-page">
+              <section className="tracking-page" data-scroll-reveal>
                 <h1>Lacak pesanan</h1>
                 <form
                   className="track-search"
@@ -1168,6 +1182,14 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                   <Tracking
                     order={tracked}
                     services={store.services}
+                    isOwner={
+                      !!auth.user &&
+                      orders.some(
+                        (order) =>
+                          order.id === tracked.id &&
+                          order.uid === auth.user?.uid,
+                      )
+                    }
                     trackingToken={
                       /^[0-9a-f-]{36}$/i.test(track.trim())
                         ? track.trim()
@@ -1205,7 +1227,7 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
                     title="Pesanan belum ditemukan"
                     text={
                       trackingError ||
-                      "Masuk untuk mencari nomor pesanan, atau gunakan link tracking dari toko."
+                      "Masuk untuk mencari nomor pesanan, atau buka tautan yang diberikan toko."
                     }
                   />
                 ) : (
@@ -1278,10 +1300,15 @@ export default function Studio({ dashboard = false }: { dashboard?: boolean }) {
               <StoreIcon size={20} />
               Tentang
             </Link>
-            <button onClick={() => setModal("login")}>
-              <User size={20} />
-              Akun
-            </button>
+            {auth.user && auth.verified ? (
+              <Link href="/profil">
+                <User size={20} /> Akun
+              </Link>
+            ) : (
+              <button onClick={() => setModal("login")}>
+                <User size={20} /> Akun
+              </button>
+            )}
           </nav>
         </>
       )}
@@ -1598,16 +1625,16 @@ function OrderForm({
       }}
     >
       <p className="eyebrow">
-        {pos ? `KASIR · CABANG ${branchName.toUpperCase()}` : "A FRESH START"}
+        {pos ? `KASIR · CABANG ${branchName.toUpperCase()}` : "PESAN LAUNDRY"}
       </p>
       <h2>
         {step === 1
           ? pos
             ? "Catat cucian masuk"
-            : "Cucianmu butuh apa?"
+            : "Pilih layanan cucianmu"
           : pos
             ? "Data pelanggan"
-            : "Ke mana kami menjemput?"}
+            : "Alamat dan jadwal jemput"}
       </h2>
       <div className="form-steps">
         <span className={step === 1 ? "active" : ""}>
@@ -1633,8 +1660,8 @@ function OrderForm({
               <option value="bogor">D’Fable Cibubur</option>
             </select>
             <small>
-              Cabang terdekat dari titik jemput dipilih otomatis. Kamu tetap
-              bisa menggantinya sebelum memesan.
+              Kami pilih cabang terdekat dari titik jemput. Kamu bisa
+              menggantinya sebelum memesan.
             </small>
           </label>
         </div>
@@ -1651,7 +1678,7 @@ function OrderForm({
                 <b>{selectedService.name}</b>
               </span>
               <strong>
-                {money(serviceRate(selectedService))}
+                {money(serviceRate(selectedService, speed))}
                 <small>
                   {selectedService.packageSize
                     ? ` / ${selectedService.packageSize} kg`
@@ -1743,7 +1770,11 @@ function OrderForm({
               : `Jumlah ${selectedService.unit}`}
             <div className="weight-control">
               <button
-                aria-label="Kurangi berat"
+                aria-label={
+                  selectedService.unit === "kg"
+                    ? "Kurangi berat"
+                    : "Kurangi jumlah"
+                }
                 type="button"
                 onClick={() =>
                   setKg(Math.max(selectedService.minimumQuantity || 1, kg - 1))
@@ -1768,7 +1799,11 @@ function OrderForm({
               />
               <span>{selectedService.unit}</span>
               <button
-                aria-label="Tambah berat"
+                aria-label={
+                  selectedService.unit === "kg"
+                    ? "Tambah berat"
+                    : "Tambah jumlah"
+                }
                 type="button"
                 onClick={() =>
                   setKg(
@@ -1783,8 +1818,12 @@ function OrderForm({
             </div>
             <small>
               {pos
-                ? "Masukkan hasil timbangan sebelum lanjut."
-                : "Berat final dikonfirmasi setelah ditimbang di studio."}
+                ? selectedService.unit === "kg"
+                  ? "Masukkan hasil timbangan sebelum lanjut."
+                  : "Masukkan jumlah barang sebelum lanjut."
+                : selectedService.unit === "kg"
+                  ? "Berat pasti dikonfirmasi setelah cucian ditimbang di toko."
+                  : "Jumlah pasti dikonfirmasi saat cucian diterima di toko."}
             </small>
           </label>
           {selectedService.rates ? (
@@ -1946,14 +1985,14 @@ function OrderForm({
               <div className="notice">
                 <Info size={18} />
                 <span>
-                  Jadwal dan ongkir dikonfirmasi toko. Pembayaran tersedia
-                  setelah berat aktual dan tagihan final dikonfirmasi.
+                  Toko akan mengonfirmasi jadwal, ongkir, dan jumlah akhir
+                  sebelum kamu melakukan pembayaran.
                 </span>
               </div>
               <label className="checkbox">
-                <input type="checkbox" required /> Saya menyetujui berat final
-                dan ongkir dikonfirmasi toko. Nomor WhatsApp disimpan untuk
-                pesanan ini dan berikutnya.
+                <input type="checkbox" required /> Saya setuju jumlah akhir dan
+                ongkir dikonfirmasi oleh toko. Nomor WhatsApp saya disimpan
+                untuk pesanan ini dan berikutnya.
               </label>
             </>
           )}
@@ -1971,7 +2010,11 @@ function OrderForm({
               ? "Total layanan"
               : `Estimasi · ${speedLabel(speed).toLowerCase()}`}
           </small>
-          <strong>{money(estimate(services, service, kg, speed))}</strong>
+          <strong>
+            {money(
+              pos && kg === 0 ? 0 : estimate(services, service, kg, speed),
+            )}
+          </strong>
           <small>
             {kg} {selectedService.unit} ·{" "}
             {pos ? "berat/jumlah aktual" : "belum termasuk ongkir"}
@@ -2272,6 +2315,12 @@ function PriceEditor({
                   {service.rates ? (
                     serviceSpeeds.map((speed) => (
                       <label className="price-editor-input" key={speed.id}>
+                        <span
+                          className="price-editor-speed-label"
+                          aria-hidden="true"
+                        >
+                          {speed.label}
+                        </span>
                         <span className="sr-only">
                           {service.name}, {speed.label}
                         </span>

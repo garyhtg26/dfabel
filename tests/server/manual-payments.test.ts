@@ -19,6 +19,7 @@ import {
 } from "../../lib/payments/manual-service";
 import { createPayment, type Gateway } from "../../lib/payments/service";
 import { publicTracking } from "../../lib/tracking-data";
+import { redeemPoints } from "../../lib/loyalty";
 
 process.env.MIDTRANS_SERVER_KEY = "SB-Mid-server-unit-test-not-a-real-key";
 process.env.MIDTRANS_IS_PRODUCTION = "false";
@@ -663,4 +664,101 @@ test("safe order and tracking summaries never reveal receipt path or reviewer id
   });
   assert.equal("proofPath" in tracking.manualPayment!, false);
   assert.equal("reviewedBy" in tracking.manualPayment!, false);
+});
+
+test("redemption debits points atomically and manual settlement awards points once on the net service", async () => {
+  const database = new MemoryDatabase();
+  database.values.set("loyalty/customer", { balance: 5000 });
+  const result = await redeemPoints(
+    database.firestore(),
+    "customer",
+    order().id,
+    5000,
+  );
+  assert.deepEqual(result, {
+    balance: 0,
+    pointsUsed: 5000,
+    total: 15000,
+    paid: false,
+  });
+  await Promise.all([
+    confirmManualPayment(order().id, staff, database.firestore()),
+    confirmManualPayment(order().id, staff, database.firestore()),
+  ]);
+  assert.equal(database.current().pointsEarned, 1500);
+  assert.equal(database.values.get("loyalty/customer")?.balance, 1500);
+  assert.equal(database.current().paid, true);
+  await assert.rejects(
+    redeemPoints(database.firestore(), "customer", order().id, 0),
+    /sudah lunas/,
+  );
+});
+
+test("points can be returned before payment and full points settle the order without earning on the discount", async () => {
+  const database = new MemoryDatabase();
+  database.values.set("loyalty/customer", { balance: 20000 });
+  await redeemPoints(database.firestore(), "customer", order().id, 5000);
+  const returned = await redeemPoints(
+    database.firestore(),
+    "customer",
+    order().id,
+    0,
+  );
+  assert.equal(returned.balance, 20000);
+  const settled = await redeemPoints(
+    database.firestore(),
+    "customer",
+    order().id,
+    20000,
+  );
+  assert.equal(settled.total, 0);
+  assert.equal(settled.balance, 0);
+  assert.equal(settled.paid, true);
+  assert.equal(database.current().pointsEarned, 0);
+  await assert.rejects(
+    redeemPoints(database.firestore(), "other", order().id, 0),
+    /pesanan sendiri/,
+  );
+});
+
+test("concurrent redemptions cannot spend the same points twice", async () => {
+  const database = new MemoryDatabase();
+  database.values.set("loyalty/customer", { balance: 5000 });
+  const secondOrder = { ...order(), id: "DF-ABCDEF123457" };
+  database.values.set(`orders/${secondOrder.id}`, structuredClone(secondOrder));
+  const outcomes = await Promise.allSettled([
+    redeemPoints(database.firestore(), "customer", order().id, 5000),
+    redeemPoints(database.firestore(), "customer", secondOrder.id, 5000),
+  ]);
+  assert.equal(
+    outcomes.filter((outcome) => outcome.status === "fulfilled").length,
+    1,
+  );
+  assert.equal(database.values.get("loyalty/customer")?.balance, 0);
+});
+
+test("a points wallet under financial review cannot be redeemed", async () => {
+  const database = new MemoryDatabase();
+  database.values.set("loyalty/customer", {
+    balance: 5000,
+    reconciliationRequired: true,
+  });
+  await assert.rejects(
+    redeemPoints(database.firestore(), "customer", order().id, 5000),
+    /sedang diperiksa/,
+  );
+  assert.equal(database.values.get("loyalty/customer")?.balance, 5000);
+});
+
+test("changing points invalidates an uploaded draft proof before it can be submitted", async () => {
+  const database = new MemoryDatabase();
+  database.values.set("loyalty/customer", { balance: 5000 });
+  const oldVersion = await proof(database);
+  await redeemPoints(database.firestore(), "customer", order().id, 5000);
+  assert.equal(database.current().manualPayment?.hasProof, false);
+  assert.equal(database.current().manualPayment?.proofVersion, undefined);
+  await assert.rejects(
+    submitManualPayment(order().id, oldVersion, database.firestore()),
+    /unggah|bukti|berubah/i,
+  );
 });

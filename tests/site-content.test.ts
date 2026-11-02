@@ -16,7 +16,7 @@ test("older settings retain all banner defaults and independent image slots", ()
     siteImage(content, "wash"),
     "/api/media/banners/wash?v=1234-abcd",
   );
-  assert.equal(siteImage(content, "iron"), "/laundry-ironing-v3.png");
+  assert.equal(siteImage(content, "iron"), "/unsplash/ironing-web.webp");
 });
 test("content writes cannot inject arbitrary photo URLs or unknown fields", () => {
   assert.equal(contentSchema.safeParse(defaultContent).success, true);
@@ -43,7 +43,7 @@ test("content writes cannot inject arbitrary photo URLs or unknown fields", () =
       siteContent({ images: { promo: "https://untrusted.invalid/image" } }),
       "promo",
     ),
-    "/promo-washer-v2.png",
+    "/promo-washer-optimized.webp",
   );
 });
 

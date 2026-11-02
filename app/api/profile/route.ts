@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { identity, sameOrigin, ApiError } from "@/lib/firebase/access";
 import { adminAuth, db } from "@/lib/firebase/admin";
+import { normalizePhone } from "@/lib/pricing";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
@@ -16,6 +17,11 @@ export async function GET(req: NextRequest) {
         name: user.displayName || "",
         email: user.email || "",
         photoVersion: profile.get("photoVersion") || "",
+        profile: {
+          name: profile.get("name") || user.displayName || "",
+          email: user.email || "",
+          phone: profile.get("phone") || "",
+        },
       },
       { headers: { "Cache-Control": "private, no-store" } },
     );
@@ -29,13 +35,41 @@ export async function PATCH(req: NextRequest) {
     const actor = (await identity(req, true))!;
     const raw = await req.text();
     if (raw.length > 2000) throw new ApiError(413, "Data terlalu besar.");
-    const { name } = z
-      .object({ name: z.string().trim().min(2).max(80) })
+    const { name, phone } = z
+      .object({
+        name: z.string().trim().min(2).max(80),
+        phone: z
+          .string()
+          .trim()
+          .max(30)
+          .transform(normalizePhone)
+          .refine(
+            (value) => !value || /^\+628\d{7,12}$/.test(value),
+            "Nomor WhatsApp tidak valid.",
+          )
+          .optional(),
+      })
       .strict()
       .parse(JSON.parse(raw));
     await adminAuth().updateUser(actor.uid, { displayName: name });
-    await db().doc(`users/${actor.uid}`).set({ name }, { merge: true });
-    return NextResponse.json({ ok: true });
+    await db()
+      .doc(`users/${actor.uid}`)
+      .set(
+        {
+          name,
+          ...(phone !== undefined ? { phone } : {}),
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true },
+      );
+    return NextResponse.json({
+      ok: true,
+      profile: {
+        name,
+        ...(phone !== undefined ? { phone } : {}),
+        email: actor.email,
+      },
+    });
   } catch (e) {
     return fail(e);
   }
@@ -44,7 +78,11 @@ function fail(e: unknown) {
   return NextResponse.json(
     {
       error:
-        e instanceof ApiError ? e.message : "Profil belum berhasil diproses.",
+        e instanceof ApiError
+          ? e.message
+          : e instanceof z.ZodError
+            ? e.issues[0]?.message
+            : "Profil belum berhasil diproses.",
     },
     {
       status:

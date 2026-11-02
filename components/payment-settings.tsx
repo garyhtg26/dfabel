@@ -224,8 +224,8 @@ export default function PaymentSettings({
             Pengaturan pembayaran {branches[branchId]}
           </h2>
           <p className="!mb-0 !text-xs leading-relaxed text-indigo-700">
-            Rekening ini ditampilkan kepada pelanggan cabang{" "}
-            {branches[branchId]}. Hanya owner dan admin yang dapat mengubahnya.
+            Pelanggan cabang {branches[branchId]} akan melihat rekening ini.
+            Hanya pemilik dan admin yang bisa mengubahnya.
           </p>
         </div>
       </div>
@@ -371,7 +371,7 @@ export default function PaymentSettings({
                     QR pembayaran
                   </h2>
                   <p className="!mb-0 !mt-1 !text-xs text-slate-500">
-                    Opsional, pelanggan tetap mengunggah bukti transfer.
+                    Opsional. Toko tetap perlu memeriksa pembayaran.
                   </p>
                 </div>
               </div>
@@ -451,7 +451,7 @@ export default function PaymentSettings({
                 <p className="!mb-0 !mt-3 !text-[11px] text-slate-400">
                   {changed
                     ? "Simpan perubahan rekening terlebih dahulu sebelum mengunggah QR."
-                    : "Perubahan gambar QR langsung ditampilkan setelah unggahan selesai."}
+                    : "QR baru langsung tampil setelah diunggah."}
                 </p>
               </div>
             </div>

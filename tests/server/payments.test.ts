@@ -434,7 +434,11 @@ test("late payment on a superseded invoice is recorded and flags review without 
 
 test("verified refund states preserve settlement history and flag financial review", async () => {
   const value = attempt();
-  const database = new MemoryDatabase({ ...baseOrder(), payment: value });
+  const database = new MemoryDatabase({
+    ...baseOrder(),
+    payment: value,
+    pointsEarned: 2000,
+  });
   database.values.set(`paymentAttempts/${value.attemptId}`, value);
   await applyVerifiedTransaction(
     value.attemptId,
@@ -449,6 +453,10 @@ test("verified refund states preserve settlement history and flag financial revi
   assert.equal(database.order().paid, true);
   assert.equal(database.order().payment?.status, "paid");
   assert.equal(database.order().paymentReconciliationRequired, true);
+  assert.equal(
+    database.values.get("loyalty/customer")?.reconciliationRequired,
+    true,
+  );
   assert.equal(
     database.values.get(`paymentAttempts/${value.attemptId}`)?.providerState,
     "partial_refund",
